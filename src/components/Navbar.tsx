@@ -11,7 +11,7 @@ const Navbar = () => {
   
   // Check if the current path is any of the login/admin/aspirant dashboard or application pages
   const isProtectedPath = 
-    location.pathname === "/login" || 
+    location.pathname === "/voters-login" || 
     location.pathname === "/admin-login" || 
     location.pathname.startsWith("/aspirant"); 
     
@@ -62,7 +62,7 @@ const Navbar = () => {
               </Link>
               
               {/* Voter Login Button */}
-              <Link to="/login">
+              <Link to="/voters-login">
                 <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
                   <User className="w-3 h-3 lg:w-4 lg:h-4" />
                   <span className="hidden lg:inline">Voter Login</span>

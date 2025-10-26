@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
 import Vote from "./pages/Vote";
+import VotersLogin from "./pages/VotersLogin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import SetupAdmin from "./pages/SetupAdmin";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/vote" element={<Vote />} />
+          <Route path="/voters-login" element={<VotersLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route path="/Rules" element={<Rules />} />

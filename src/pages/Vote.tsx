@@ -71,7 +71,7 @@ const Vote = () => {
         }
 
         if (!session?.voterId || !session?.email) {
-          navigate("/login", { replace: true });
+          navigate("/voters-login", { replace: true });
           return;
         }
 
