@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
+     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       {
@@ -26,19 +26,36 @@ serve(async (req) => {
         },
       }
     );
-
+    // ... inside try block ...
     const { voterId, email } = await req.json();
 
-    // Generate 6-digit OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+// 1. [NEW STEP] Invalidate any existing unverified OTPs for this voter
+    const { error: invalidateError } = await supabaseAdmin
+     .from("voter_otp")
+  .update({ verified: true }) // Mark them as "used" or "verified" so they can't be used
+  .eq("voter_id", voterId)
+  .eq("verified", false)
+  .gt("expires_at", new Date().toISOString());
 
-    // Store OTP in database
-    const { error: otpError } = await supabaseAdmin
-      .from("voter_otp")
-      .insert({
-        voter_id: voterId,
-        otp_code: otpCode,
-      });
+if (invalidateError) {
+  console.error("OTP invalidation error:", invalidateError);
+  // Do NOT throw. This is a cleanup step. Log and continue.
+}
+
+// Generate 6-digit OTP
+const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+ 
+// The verify-otp function currently checks for `expires_at`.
+const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+// Store OTP in database
+const { error: otpError } = await supabaseAdmin
+  .from("voter_otp")
+  .insert({
+    voter_id: voterId,
+    otp_code: otpCode,
+    expires_at: tenMinutesFromNow, // ADD THIS LINE (if your table supports it)
+  });
 
     if (otpError) {
       console.error("OTP insert error:", otpError);

@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, ArrowLeft, ArrowRight, Upload, Download, MessageCircle, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Trophy, ArrowLeft, ArrowRight, Upload, Download, MessageCircle, Loader2, CheckCircle2, AlertCircle, Lock, Save, FileText, Printer } from "lucide-react";
 import { z } from "zod";
+import { User } from "@supabase/supabase-js";
 
 // FIX 1: Removed 'min_level' and 'max_level' from the interface 
 // to resolve the type mismatch with the Supabase query's return type.
@@ -47,11 +48,7 @@ interface ApplicationData {
   // Step 4: Leadership
   leadership_history: string;
   
-  // Step 5: Documents
-  referee_form: File | null;
-  declaration_form: File | null;
-  
-  // Step 6: Payment
+  // Step 5: Payment
   payment_proof: File | null;
 }
 
@@ -63,7 +60,7 @@ const departments = [
   "Nursing", "Anatomy", "Physiology", "Medical Lab Science", "MBBS", "Public Health"
 ];
 
-const levels = ["100", "200", "300", "400", "500"];
+const levels = ["100L", "200L", "300L", "400L", "500L"];
 
 const AspirantApplication = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -83,19 +80,110 @@ const AspirantApplication = () => {
     why_running: "",
     cgpa: "",
     leadership_history: "",
-    referee_form: null,
-    declaration_form: null,
     payment_proof: null,
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [user, setUser] = useState<User | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set());
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Authentication check
+  const checkAuthentication = useCallback(async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      
+      if (!authUser) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to access the application form.",
+          variant: "destructive",
+        });
+        navigate("/login", { state: { returnTo: "/aspirant/apply" } });
+        return;
+      }
+
+      setUser(authUser);
+      setIsCheckingAuth(false);
+      
+      // Load saved progress
+      await loadSavedProgress(authUser.id);
+    } catch (error) {
+      console.error("Error checking authentication:", error);
+      toast({
+        title: "Authentication Error",
+        description: "Failed to verify authentication. Please try logging in again.",
+        variant: "destructive",
+      });
+      navigate("/login");
+    }
+  }, [navigate, toast]);
+
+  useEffect(() => {
+    checkAuthentication();
+  }, [checkAuthentication]);
+
+  // Load saved progress from localStorage or database
+  const loadSavedProgress = async (userId: string) => {
+    try {
+      const savedData = localStorage.getItem(`aspirant_draft_${userId}`);
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        setApplicationData(prev => ({ ...prev, ...parsedData.data }));
+        setCurrentStep(parsedData.currentStep || 1);
+        setSavedSteps(new Set(parsedData.savedSteps || []));
+        
+        toast({
+          title: "Progress Restored",
+          description: "Your previous application progress has been restored.",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading saved progress:", error);
+    }
+  };
+
+  // Save progress to localStorage
+  const saveProgress = async (step: number) => {
+    if (!user) return;
+    
+    setIsSaving(true);
+    try {
+      const progressData = {
+        data: applicationData,
+        currentStep: step,
+        savedSteps: Array.from(savedSteps),
+        lastSaved: new Date().toISOString()
+      };
+      
+      localStorage.setItem(`aspirant_draft_${user.id}`, JSON.stringify(progressData));
+      setSavedSteps(prev => new Set([...prev, step]));
+      
+      toast({
+        title: "Progress Saved",
+        description: `Step ${step} has been saved. You can continue later.`,
+      });
+    } catch (error) {
+      console.error("Error saving progress:", error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save progress. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // FIX 4: Wrapped loadPositions in useCallback to resolve react-hooks/exhaustive-deps warning
   const loadPositions = useCallback(async () => {
+    if (!user) return;
+    
     try {
       // FIX 1: Explicitly selected fields to match the Position interface 
       // and ensure only active positions are fetched.
@@ -115,20 +203,24 @@ const AspirantApplication = () => {
         description: "Failed to load positions",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
-  }, [toast]); // Dependency array for useCallback
+  }, [toast, user]); // Dependency array for useCallback
 
   // FIX 4: Added loadPositions to the dependency array
   useEffect(() => {
-    loadPositions();
-    
-    // Check if position was pre-selected from dashboard
-    const preSelectedPosition = location.state?.selectedPosition;
-    if (preSelectedPosition) {
-      setSelectedPosition(preSelectedPosition);
-      setApplicationData(prev => ({ ...prev, position_id: preSelectedPosition.id }));
+    if (user && !isCheckingAuth) {
+      loadPositions();
+      
+      // Check if position was pre-selected from dashboard
+      const preSelectedPosition = location.state?.selectedPosition;
+      if (preSelectedPosition) {
+        setSelectedPosition(preSelectedPosition);
+        setApplicationData(prev => ({ ...prev, position_id: preSelectedPosition.id }));
+      }
     }
-  }, [location.state, loadPositions]);
+  }, [location.state, loadPositions, user, isCheckingAuth]);
 
   const validateStep = (step: number): boolean => {
     const errors: Record<string, string> = {};
@@ -157,12 +249,22 @@ const AspirantApplication = () => {
       // FIX 2: Wrapped the case block in curly braces to allow lexical declaration (const/let)
       case 2: {
         if (!applicationData.position_id) errors.position_id = "Position is required";
+        if (selectedPosition) {
+            const applicantLevel = applicationData.level; // Level is collected in Step 1
+            const eligibleLevels = selectedPosition.eligible_levels;
+
+            // Check if the applicant's level is NOT included in the eligible list
+            if (!eligibleLevels.includes(applicantLevel)) {
+                // Use a dedicated error key for eligibility
+                errors.position_level_error = `Your level (${applicantLevel}L) is not eligible for the position: ${selectedPosition.name}. Eligible levels: ${eligibleLevels.map(l => `${l}L`).join(', ')}`;
+            }
+        }
         const wordCount = applicationData.why_running.trim().split(/\s+/).length;
         if (wordCount < 20 || wordCount > 1000) {
           errors.why_running = "Why running must be between 20-1000 words";
         }
-        break;
-      }
+      break;
+    }
        case 3: {
         try {
           const cgpa = parseFloat(applicationData.cgpa);
@@ -186,11 +288,6 @@ const AspirantApplication = () => {
       }
         
       case 5:
-        if (!applicationData.referee_form) errors.referee_form = "Referee form is required";
-        if (!applicationData.declaration_form) errors.declaration_form = "Declaration form is required";
-        break;
-        
-      case 6:
         if (!applicationData.payment_proof) errors.payment_proof = "Payment proof is required";
         break;
     }
@@ -199,9 +296,11 @@ const AspirantApplication = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 6));
+      // Save current step before moving to next
+      await saveProgress(currentStep);
+      setCurrentStep(prev => Math.min(prev + 1, 5));
     }
   };
 
@@ -240,78 +339,73 @@ const AspirantApplication = () => {
   };
 
   const handleSubmitApplication = async () => {
-    if (!validateStep(6)) return;
+    if (!validateStep(5)) return;
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to submit your application.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     
     try {
       // Upload files first
-      const uploads = [];
+      const uploadedUrls: Record<string, string> = {};
       
       if (applicationData.photo) {
-        uploads.push(
-          supabase.storage
-            .from('aspirant-documents')
-            .upload(`photos/${Date.now()}_${applicationData.photo.name}`, applicationData.photo)
-        );
-      }
-      
-      if (applicationData.referee_form) {
-        uploads.push(
-          supabase.storage
-            .from('aspirant-documents')
-            .upload(`referee-forms/${Date.now()}_${applicationData.referee_form.name}`, applicationData.referee_form)
-        );
-      }
-      
-      if (applicationData.declaration_form) {
-        uploads.push(
-          supabase.storage
-            .from('aspirant-documents')
-            .upload(`declarations/${Date.now()}_${applicationData.declaration_form.name}`, applicationData.declaration_form)
-        );
+        const photoPath = `photos/${user.id}_${Date.now()}_${applicationData.photo.name}`;
+        const { data: photoUpload, error: photoError } = await supabase.storage
+          .from('aspirant-documents')
+          .upload(photoPath, applicationData.photo);
+        
+        if (photoError) throw photoError;
+        
+        const { data: photoUrl } = supabase.storage
+          .from('aspirant-documents')
+          .getPublicUrl(photoPath);
+        
+        uploadedUrls.photo_url = photoUrl.publicUrl;
       }
       
       if (applicationData.payment_proof) {
-        uploads.push(
-          supabase.storage
-            .from('aspirant-documents')
-            .upload(`payments/${Date.now()}_${applicationData.payment_proof.name}`, applicationData.payment_proof)
-        );
+        const paymentPath = `payments/${user.id}_${Date.now()}_${applicationData.payment_proof.name}`;
+        const { data: paymentUpload, error: paymentError } = await supabase.storage
+          .from('aspirant-documents')
+          .upload(paymentPath, applicationData.payment_proof);
+        
+        if (paymentError) throw paymentError;
+        
+        const { data: paymentUrl } = supabase.storage
+          .from('aspirant-documents')
+          .getPublicUrl(paymentPath);
+        
+        uploadedUrls.payment_proof_url = paymentUrl.publicUrl;
       }
-      
-      const uploadResults = await Promise.all(uploads);
-      
-      // Get public URLs
-      const getPublicUrl = (path: string) => {
-        const { data } = supabase.storage.from('aspirant-documents').getPublicUrl(path);
-        return data.publicUrl;
-      };
       
       // Create application record
       const { data: aspirant, error } = await supabase
         .from("aspirants")
-        // FIX 3: Used 'as any' to bypass the type error (2769) caused by Supabase's generated insert types
         .insert({
+          user_id: user.id,
           full_name: applicationData.full_name,
           matric: applicationData.matric.toLowerCase(),
           email: applicationData.email,
           phone: applicationData.phone,
           department: applicationData.department,
           level: applicationData.level,
-          dob: applicationData.dob,
+          date_of_birth: applicationData.dob,
           gender: applicationData.gender,
           cgpa: parseFloat(applicationData.cgpa),
           position_id: applicationData.position_id,
           why_running: applicationData.why_running,
           leadership_history: applicationData.leadership_history,
-          photo_url: uploadResults[0]?.data?.path ? getPublicUrl(uploadResults[0].data.path) : null,
-          referee_form_url: uploadResults[1]?.data?.path ? getPublicUrl(uploadResults[1].data.path) : null,
-          declaration_form_url: uploadResults[2]?.data?.path ? getPublicUrl(uploadResults[2].data.path) : null,
-          payment_proof_url: uploadResults[3]?.data?.path ? getPublicUrl(uploadResults[3].data.path) : null,
+          ...uploadedUrls,
           status: "submitted",
           admin_review_status: "pending",
-        } as any) // Type assertion to resolve TS error 2769
+        })
         .select()
         .single();
       
@@ -319,6 +413,9 @@ const AspirantApplication = () => {
       
       // Store matric for future dashboard access
       localStorage.setItem("aspirantMatric", applicationData.matric.toLowerCase());
+      
+      // Clear saved draft
+      localStorage.removeItem(`aspirant_draft_${user.id}`);
       
       toast({
         title: "Application Submitted!",
@@ -357,34 +454,103 @@ const AspirantApplication = () => {
       case 2: return "Position & Motivation";
       case 3: return "Academic Information";
       case 4: return "Leadership Experience";
-      case 5: return "Required Documents";
-      case 6: return "Payment Proof";
+      case 5: return "Payment Proof";
       default: return "";
     }
   };
 
-  const progress = (currentStep / 6) * 100;
+  const progress = (currentStep / 5) * 100;
+
+  // Show loading screen while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Checking authentication...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Show authentication required message if user is not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12">
+          <div className="container mx-auto max-w-2xl text-center">
+            <Card className="p-6 sm:p-8">
+              <div className="mb-6">
+                <Lock className="w-12 h-12 sm:w-16 sm:h-16 text-muted-foreground mx-auto mb-4" />
+                <h1 className="text-xl sm:text-2xl font-bold mb-2">Authentication Required</h1>
+                <p className="text-muted-foreground text-sm sm:text-base">
+                  You need to be logged in to access the aspirant application form.
+                </p>
+              </div>
+              <div className="space-y-4">
+                <Button 
+                  onClick={() => navigate("/login", { state: { returnTo: "/aspirant/apply" } })}
+                  className="w-full bg-gradient-primary"
+                >
+                  Log In to Continue
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate("/aspirant")}
+                  className="w-full"
+                >
+                  Back to Dashboard
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading application form...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="pt-24 px-4 pb-12">
+      <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12">
         <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center p-4 bg-gradient-secondary rounded-full shadow-glow mb-4">
-              <Trophy className="w-8 h-8 text-secondary-foreground" />
+          <div className="text-center mb-6 sm:mb-8 animate-fade-in">
+            <div className="inline-flex items-center justify-center p-3 sm:p-4 bg-gradient-secondary rounded-full shadow-glow mb-4">
+              <Trophy className="w-6 h-6 sm:w-8 sm:h-8 text-secondary-foreground" />
             </div>
-            <h1 className="text-4xl font-bold mb-2 text-foreground">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 text-foreground">
               Aspirant Application
             </h1>
-            <p className="text-lg text-muted-foreground">
-              Step {currentStep} of 6: {getStepTitle()}
+            <p className="text-base sm:text-lg text-muted-foreground">
+              Step {currentStep} of 5: {getStepTitle()}
             </p>
+            <div className="mt-2 flex items-center justify-center gap-2 text-xs sm:text-sm text-muted-foreground">
+              <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-success" />
+              <span>Authenticated as {user.email}</span>
+            </div>
           </div>
 
           {/* Progress Bar */}
-          <Card className="p-6 mb-8">
+          <Card className="p-4 sm:p-6 mb-6 sm:mb-8">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Application Progress</span>
@@ -393,25 +559,28 @@ const AspirantApplication = () => {
               <Progress value={progress} className="h-2" />
             </div>
             
-            <div className="grid grid-cols-6 gap-2 mt-4 text-xs">
-              {[1, 2, 3, 4, 5, 6].map((step) => (
-                <div key={step} className={`text-center p-2 rounded ${
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 mt-4 text-xs">
+              {[1, 2, 3, 4, 5].map((step) => (
+                <div key={step} className={`text-center p-1 sm:p-2 rounded text-xs ${
                   step === currentStep ? 'bg-primary text-primary-foreground' :
                   step < currentStep ? 'bg-success text-success-foreground' :
                   'bg-muted text-muted-foreground'
                 }`}>
-                  Step {step}
+                  <div className="flex items-center justify-center gap-1">
+                    Step {step}
+                    {savedSteps.has(step) && <Save className="w-3 h-3" />}
+                  </div>
                 </div>
               ))}
             </div>
           </Card>
 
           {/* Application Form */}
-          <Card className="p-8">
+          <Card className="p-4 sm:p-6 lg:p-8">
             {/* Step 1: Personal Information */}
             {currentStep === 1 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Personal Information</h2>
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Personal Information</h2>
                 
                 <div className="space-y-2">
                   <Label htmlFor="photo">Profile Photo *</Label>
@@ -426,7 +595,7 @@ const AspirantApplication = () => {
                   <p className="text-xs text-muted-foreground">JPG/PNG, max 1MB</p>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="full_name">Full Name *</Label>
                     <Input
@@ -533,8 +702,8 @@ const AspirantApplication = () => {
 
             {/* Step 2: Position & Motivation */}
             {currentStep === 2 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Position & Motivation</h2>
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Position & Motivation</h2>
                 
                 <div className="space-y-2">
                   <Label htmlFor="position_id">Select Position *</Label>
@@ -557,6 +726,17 @@ const AspirantApplication = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* ⬅️ DISPLAY POSITION REQUIRED ERROR */}
+                  {validationErrors.position_id && <p className="text-sm text-destructive">{validationErrors.position_id}</p>}
+                  
+                  {/* ⬅️ DISPLAY NEW LEVEL INELIGIBILITY ERROR */}
+                  {validationErrors.position_level_error && (
+                    <div className="mt-2 p-3 bg-red-100 border border-destructive rounded-md">
+                        <p className="text-sm text-destructive font-medium">
+                            {validationErrors.position_level_error}
+                        </p>
+                        </div>
+                  )}
                   {validationErrors.position_id && <p className="text-sm text-destructive">{validationErrors.position_id}</p>}
                 </div>
 
@@ -564,7 +744,7 @@ const AspirantApplication = () => {
                   <Card className="p-4 bg-muted/30">
                     <h3 className="font-semibold mb-2">{selectedPosition.name}</h3>
                     <p className="text-sm text-muted-foreground mb-2">{selectedPosition.description}</p>
-                    <div className="flex gap-4 text-sm">
+                    <div className="flex flex-wrap gap-2 text-sm">
                       <Badge variant="outline">
                           Levels: {selectedPosition.eligible_levels.map(l => `${l}L`).join(', ')}
                       </Badge>
@@ -580,7 +760,7 @@ const AspirantApplication = () => {
                     value={applicationData.why_running}
                     onChange={(e) => setApplicationData(prev => ({ ...prev, why_running: e.target.value }))}
                     placeholder="Explain your motivation, vision, and what you hope to achieve in this role..."
-                    rows={8}
+                    rows={6}
                     className="resize-none"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
@@ -594,8 +774,8 @@ const AspirantApplication = () => {
 
             {/* Step 3: Academic Information */}
             {currentStep === 3 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Academic Information</h2>
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Academic Information</h2>
                 
                 <div className="space-y-2">
                   <Label htmlFor="cgpa">Current CGPA *</Label>
@@ -629,13 +809,27 @@ const AspirantApplication = () => {
                     </div>
                   )}
                 </div>
+
+                <Card className="p-4 bg-blue-50 border-blue-200">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-blue-900 mb-1">Academic Requirements:</p>
+                      <ul className="text-blue-800 space-y-1">
+                        <li>• Your most recent statement of result showing CGPA will be submitted on screening day</li>
+                        <li>• Ensure your CGPA meets the minimum requirement for your chosen position</li>
+                        <li>• Academic transcripts must be official and recent</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
 
             {/* Step 4: Leadership Experience */}
             {currentStep === 4 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Leadership Experience</h2>
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Leadership Experience</h2>
                 
                 <div className="space-y-2">
                   <Label htmlFor="leadership_history">Leadership History *</Label>
@@ -644,7 +838,7 @@ const AspirantApplication = () => {
                     value={applicationData.leadership_history}
                     onChange={(e) => setApplicationData(prev => ({ ...prev, leadership_history: e.target.value }))}
                     placeholder="Describe your leadership experience, positions held, achievements, and how they prepare you for this role..."
-                    rows={8}
+                    rows={6}
                     className="resize-none"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
@@ -653,89 +847,53 @@ const AspirantApplication = () => {
                   </div>
                   {validationErrors.leadership_history && <p className="text-sm text-destructive">{validationErrors.leadership_history}</p>}
                 </div>
-              </div>
-            )}
 
-            {/* Step 5: Required Documents */}
-            {currentStep === 5 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Required Documents</h2>
-                
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="referee_form">Referee Form *</Label>
-                    <div className="space-y-3">
-                      <Input
-                        id="referee_form"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => handleFileUpload('referee_form', e.target.files?.[0] || null)}
-                        className="cursor-pointer"
-                      />
-                      {validationErrors.referee_form && <p className="text-sm text-destructive">{validationErrors.referee_form}</p>}
-                      <p className="text-xs text-muted-foreground">PDF/JPG/PNG, max 2MB</p>
-                      
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => downloadForm('referee')}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Download Form
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={openWhatsApp}>
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          Get at NUNSA Café
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="declaration_form">Declaration Statement *</Label>
-                    <div className="space-y-3">
-                      <Input
-                        id="declaration_form"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => handleFileUpload('declaration_form', e.target.files?.[0] || null)}
-                        className="cursor-pointer"
-                      />
-                      {validationErrors.declaration_form && <p className="text-sm text-destructive">{validationErrors.declaration_form}</p>}
-                      <p className="text-xs text-muted-foreground">PDF/JPG/PNG, max 2MB</p>
-                      
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => downloadForm('declaration')}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Download Form
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={openWhatsApp}>
-                          <MessageCircle className="w-4 h-4 mr-2" />
-                          Get at NUNSA Café
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <Card className="p-4 bg-blue-50 border-blue-200">
+                <Card className="p-4 bg-amber-50 border-amber-200">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
-                      <p className="font-medium text-blue-900 mb-1">Document Requirements:</p>
-                      <ul className="text-blue-800 space-y-1">
-                        <li>• Referee form must be completed and signed by an academic staff</li>
-                        <li>• Declaration statement must be signed and dated</li>
-                        <li>• All documents must be clearly legible</li>
-                        <li>• Contact NUNSA Café via WhatsApp: 07040640646 for physical forms</li>
+                      <p className="font-medium text-amber-900 mb-1">Required Documents for Screening Day:</p>
+                      <ul className="text-amber-800 space-y-1">
+                        <li>• Referee form (completed and signed by academic staff)</li>
+                        <li>• Declaration statement (signed and dated)</li>
+                        <li>• Statement of result showing most recent CGPA</li>
+                        <li>• All documents must be clearly legible and official</li>
                       </ul>
+                      <div className="mt-3 space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" onClick={() => downloadForm('referee')} className="gap-2">
+                            <Download className="w-4 h-4" />
+                            Download Referee Form
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadForm('declaration')} className="gap-2">
+                            <FileText className="w-4 h-4" />
+                            Download Declaration Form
+                          </Button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2">
+                            <Printer className="w-4 h-4" />
+                            Print Forms
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={openWhatsApp} className="gap-2">
+                            <MessageCircle className="w-4 h-4" />
+                            Contact NUNSA Café
+                          </Button>
+                        </div>
+                        <p className="text-xs text-amber-700 mt-2">
+                          WhatsApp: 07040640646 for physical forms and assistance
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </Card>
               </div>
             )}
 
-            {/* Step 6: Payment Proof */}
-            {currentStep === 6 && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-bold mb-6">Payment Proof</h2>
+            {/* Step 5: Payment Proof */}
+            {currentStep === 5 && (
+              <div className="space-y-4 sm:space-y-6">
+                <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Payment Proof</h2>
                 
                 {selectedPosition && (
                   <Card className="p-4 bg-green-50 border-green-200">
@@ -782,47 +940,63 @@ const AspirantApplication = () => {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-8 border-t">
+            <div className="flex flex-col sm:flex-row justify-between gap-4 pt-6 sm:pt-8 border-t">
               <Button
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 1}
-                className="gap-2"
+                className="gap-2 order-2 sm:order-1"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Previous
               </Button>
 
-              {currentStep < 6 ? (
-                <Button onClick={handleNext} className="gap-2 bg-gradient-primary">
-                  Next
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              ) : (
-                <Button 
-                  onClick={handleSubmitApplication}
-                  disabled={isSubmitting}
-                  className="gap-2 bg-gradient-success"
+              <div className="flex gap-2 order-1 sm:order-2">
+                <Button
+                  variant="outline"
+                  onClick={() => saveProgress(currentStep)}
+                  disabled={isSaving}
+                  className="gap-2"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Submitting...
-                    </>
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <>
-                      <CheckCircle2 className="w-4 h-4" />
-                      Submit Application
-                    </>
+                    <Save className="w-4 h-4" />
                   )}
-                  
+                  Save Progress
                 </Button>
-              )}
+
+                {currentStep < 5 ? (
+                  <Button onClick={handleNext} className="gap-2 bg-gradient-primary">
+                    Next
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleSubmitApplication}
+                    disabled={isSubmitting}
+                    className="gap-2 bg-gradient-success"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        Submit Application
+                      </>
+                    )}
+                    
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
 
           {/* Back to Dashboard */}
-          <div className="text-center mt-8">
+          <div className="text-center mt-6 sm:mt-8">
             <Button variant="ghost" onClick={() => navigate("/aspirant")} className="gap-2">
               <ArrowLeft className="w-4 h-4" />
               Back to Dashboard

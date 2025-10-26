@@ -1,221 +1,154 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Fingerprint, Loader2, Mail } from "lucide-react";
-import { z } from "zod";
-
-const matricSchema = z.object({
-  matric: z.string()
-    .trim()
-    .toLowerCase()
-    .regex(/^\d{2}\/\d{2}[a-z]{3}\d{3}$/, "Invalid matric format (e.g., 21/08nus014)"),
-});
+import { Eye, EyeOff, Loader2, LogIn, UserPlus } from "lucide-react";
+import Navbar from "@/components/Navbar";
 
 const Login = () => {
-  const [matric, setMatric] = useState("");
-  const [step, setStep] = useState<"matric" | "auth" | "otp">("matric");
-  const [voterId, setVoterId] = useState("");
-  const [email, setEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginData, setLoginData] = useState({
+    email: "",
+    password: "",
+  });
+  const [signupData, setSignupData] = useState({
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleMatricSubmit = async (e: React.FormEvent) => {
+  // Get the return URL from location state or default to home
+  const returnTo = location.state?.returnTo || "/";
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if user is admin
+        const { data: adminData } = await supabase
+          .from("admin_users")
+          .select("*")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (adminData) {
+          navigate("/admin");
+        } else {
+          navigate(returnTo);
+        }
+      }
+    };
+    checkUser();
+  }, [navigate, returnTo]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setIsLoading(true);
+
     try {
-      const validated = matricSchema.parse({ matric });
-      setIsLoading(true);
-
-      // Check if voter exists and is verified
-      const { data, error } = await supabase.functions.invoke("lookup-voter", {
-        body: { matric: validated.matric },
-      });
-
-      if (error) throw error;
-      const voterData = data?.voter;
-
-      if (!voterData) {
-        toast({
-          title: "Not Registered",
-          description: "This matric number is not registered. Please register first.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      if (!voterData.verified) {
-        toast({
-          title: "Not Verified",
-          description: "Please complete your registration verification first.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      setVoterId(voterData.id);
-      setEmail(voterData.email);
-      setStep("auth");
-
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast({
-          title: "Validation Error",
-          description: error.errors[0].message,
-          variant: "destructive",
-        });
-      } else {
-        console.error("Matric check error:", error);
-        toast({
-          title: "Error",
-          description: "Failed to verify matric number. Please try again.",
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBiometricAuth = async () => {
-    try {
-      setIsLoading(true);
-
-      // Check if WebAuthn is supported
-      if (!window.PublicKeyCredential) {
-        toast({
-          title: "Not Supported",
-          description: "Biometric authentication is not supported on this device. Using OTP instead.",
-          variant: "destructive",
-        });
-        await handleOTPRequest();
-        return;
-      }
-
-      // Get biometric credentials from database
-      const { data: bioData, error: bioError } = await supabase
-        .from("voter_biometric")
-        .select("credential_id, public_key")
-        .eq("voter_id", voterId)
-        .maybeSingle();
-
-      if (bioError || !bioData) {
-        toast({
-          title: "Biometric Not Set Up",
-          description: "Biometric authentication not found. Using OTP instead.",
-        });
-        await handleOTPRequest();
-        return;
-      }
-
-      // Perform WebAuthn authentication
-      const challenge = new Uint8Array(32);
-      crypto.getRandomValues(challenge);
-
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          allowCredentials: [{
-            id: Uint8Array.from(atob(bioData.credential_id), c => c.charCodeAt(0)),
-            type: "public-key",
-          }],
-          timeout: 60000,
-        },
-      });
-
-      if (credential) {
-        toast({
-          title: "Authentication Successful",
-          description: "Biometric verified. Redirecting to voting...",
-        });
-        // Persist lightweight voter session
-        localStorage.setItem(
-          "voterSession",
-          JSON.stringify({ voterId, email, authenticatedAt: Date.now() })
-        );
-        setTimeout(() => navigate("/vote"), 1000);
-      }
-
-    } catch (error) {
-      console.error("Biometric auth error:", error);
-      toast({
-        title: "Biometric Failed",
-        description: "Authentication failed. Would you like to use OTP instead?",
-        variant: "destructive",
-      });
-      setStep("otp");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOTPRequest = async () => {
-    try {
-      setIsLoading(true);
-      setStep("otp");
-
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { voterId, email },
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
       });
 
       if (error) throw error;
 
-      toast({
-        title: "OTP Sent",
-        description: `Verification code sent to ${email}`,
-      });
+      if (data.user) {
+        // Check if user is admin
+        const { data: adminData } = await supabase
+          .from("admin_users")
+          .select("*")
+          .eq("user_id", data.user.id)
+          .maybeSingle();
 
-    } catch (error) {
-      console.error("OTP request error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send OTP. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOTPVerify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      setIsLoading(true);
-
-      const { data, error } = await supabase.functions.invoke("verify-otp", {
-        body: { voterId, otpCode },
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
         toast({
           title: "Login Successful",
-          description: "OTP verified. Redirecting to voting...",
+          description: `Welcome back, ${data.user.email}!`,
         });
-        // Persist lightweight voter session
-        localStorage.setItem(
-          "voterSession",
-          JSON.stringify({ voterId, email, authenticatedAt: Date.now() })
-        );
-        setTimeout(() => navigate("/vote"), 1000);
-      }
 
-    } catch (error) {
-      console.error("OTP verify error:", error);
+        if (adminData) {
+          navigate("/admin");
+        } else {
+          navigate(returnTo);
+        }
+      }
+    } catch (error: any) {
+      console.error("Login error:", error);
       toast({
-        title: "Verification Failed",
-        description: "Invalid or expired OTP. Please try again.",
+        title: "Login Failed",
+        description: error.message || "Invalid email or password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (signupData.password !== signupData.confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (signupData.password.length < 6) {
+      toast({
+        title: "Weak Password",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: signupData.email,
+        password: signupData.password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        toast({
+          title: "Account Created",
+          description: "Your account has been created successfully. You can now log in.",
+        });
+
+        // Clear signup form and switch to login tab
+        setSignupData({
+          email: "",
+          password: "",
+          confirmPassword: "",
+        });
+        
+        // Auto-fill login form
+        setLoginData({
+          email: signupData.email,
+          password: "",
+        });
+      }
+    } catch (error: any) {
+      console.error("Signup error:", error);
+      toast({
+        title: "Signup Failed",
+        description: error.message || "Failed to create account",
         variant: "destructive",
       });
     } finally {
@@ -229,192 +162,164 @@ const Login = () => {
       
       <main className="pt-24 px-4 pb-12">
         <div className="container mx-auto max-w-md">
-          <Card className="p-8 animate-fade-in">
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center p-4 bg-gradient-primary rounded-full shadow-glow mb-4">
-                {step === "matric" ? (
-                  <Fingerprint className="w-8 h-8 text-primary-foreground" />
-                ) : step === "auth" ? (
-                  <Fingerprint className="w-8 h-8 text-primary-foreground" />
-                ) : (
-                  <Mail className="w-8 h-8 text-primary-foreground" />
-                )}
-              </div>
-              <h1 className="text-3xl font-bold mb-2 text-foreground">
-                {step === "matric" ? "Voter Login" : step === "auth" ? "Authenticate" : "Verify OTP"}
-              </h1>
-              <p className="text-muted-foreground">
-                {step === "matric" 
-                  ? "Enter your matric number to continue" 
-                  : step === "auth"
-                  ? "Choose your authentication method"
-                  : "Enter the code sent to your email"}
-              </p>
-            </div>
+          <div className="text-center mb-8 animate-fade-in">
+            <h1 className="text-4xl font-bold mb-2 text-foreground">
+              Welcome Back
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Access your account to participate in NUNSA elections
+            </p>
+          </div>
 
-            {step === "matric" ? (
-              <form onSubmit={handleMatricSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="matric">Matric Number</Label>
-                  <Input
-                    id="matric"
-                    type="text"
-                    placeholder="21/08nus014"
-                    value={matric}
-                    onChange={(e) => setMatric(e.target.value)}
-                    required
-                    maxLength={50}
-                    className="text-lg"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Format: YY/YYddd### (e.g., 21/08nus014)
-                  </p>
-                </div>
+          <Card className="p-8">
+            <Tabs defaultValue="login" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Login</TabsTrigger>
+                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              </TabsList>
 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-primary hover:shadow-glow text-lg py-6"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    "Continue"
-                  )}
-                </Button>
-
-                <div className="text-center text-sm text-muted-foreground">
-                  Not registered yet?{" "}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={() => navigate("/register")}
-                    type="button"
-                  >
-                    Register here
-                  </Button>
-                </div>
-              </form>
-            ) : step === "auth" ? (
-              <div className="space-y-4">
-                <Button 
-                  onClick={handleBiometricAuth}
-                  className="w-full bg-gradient-primary hover:shadow-glow text-lg py-6"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Authenticating...
-                    </>
-                  ) : (
-                    <>
-                      <Fingerprint className="w-5 h-5 mr-2" />
-                      Use Biometric
-                    </>
-                  )}
-                </Button>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+              <TabsContent value="login" className="space-y-4 mt-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="your.email@example.com"
+                      required
+                    />
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
-                      Or
-                    </span>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        value={loginData.password}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Enter your password"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                </div>
 
-                <Button 
-                  onClick={handleOTPRequest}
-                  variant="outline"
-                  className="w-full text-lg py-6"
-                  disabled={isLoading}
-                >
-                  <Mail className="w-5 h-5 mr-2" />
-                  Use OTP Instead
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setStep("matric")}
-                  type="button"
-                >
-                  Back to Matric Entry
-                </Button>
-              </div>
-            ) : (
-              <form onSubmit={handleOTPVerify} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Verification Code</Label>
-                  <Input
-                    id="otp"
-                    type="text"
-                    placeholder="Enter 6-digit code"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    required
-                    maxLength={6}
-                    className="text-lg text-center tracking-widest"
-                  />
-                  <p className="text-xs text-muted-foreground text-center">
-                    Check your email: {email}
-                  </p>
-                </div>
-
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-primary hover:shadow-glow text-lg py-6"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    "Verify & Login"
-                  )}
-                </Button>
-
-                <div className="flex justify-between text-sm">
                   <Button
-                    variant="link"
-                    className="p-0 h-auto text-muted-foreground"
-                    onClick={handleOTPRequest}
-                    type="button"
+                    type="submit"
+                    className="w-full bg-gradient-primary"
                     disabled={isLoading}
                   >
-                    Resend Code
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Log In
+                      </>
+                    )}
                   </Button>
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-muted-foreground"
-                    onClick={() => setStep("auth")}
-                    type="button"
-                  >
-                    Try Biometric
-                  </Button>
-                </div>
-              </form>
-            )}
+                </form>
+              </TabsContent>
 
-            <div className="mt-8 p-4 bg-muted/30 rounded-lg">
-              <h4 className="font-semibold text-sm mb-2 text-foreground">Security Notice</h4>
-              <p className="text-xs text-muted-foreground">
-                {step === "matric" 
-                  ? "Your matric number is verified against our secure student roster."
-                  : step === "auth"
-                  ? "Biometric data never leaves your device. OTP is sent securely to your registered email."
-                  : "OTP codes expire after 10 minutes for your security."}
-              </p>
-            </div>
+              <TabsContent value="signup" className="space-y-4 mt-6">
+                <form onSubmit={handleSignup} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-email">Email</Label>
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      value={signupData.email}
+                      onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="your.email@example.com"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="signup-password"
+                        type={showPassword ? "text" : "password"}
+                        value={signupData.password}
+                        onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Create a password (min 6 characters)"
+                        required
+                        minLength={6}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">Confirm Password</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      value={signupData.confirmPassword}
+                      onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="Confirm your password"
+                      required
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-gradient-secondary"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating account...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Create Account
+                      </>
+                    )}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
           </Card>
+
+          <div className="text-center mt-6">
+            <p className="text-sm text-muted-foreground">
+              Need help? Contact the electoral commission for assistance.
+            </p>
+          </div>
         </div>
       </main>
     </div>

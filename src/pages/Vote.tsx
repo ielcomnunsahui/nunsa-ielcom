@@ -235,9 +235,9 @@ const Vote = () => {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="pt-24 px-4 pb-12 flex items-center justify-center min-h-[60vh]">
+        <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12 flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 animate-spin text-primary mx-auto mb-4" />
             <p className="text-muted-foreground">Loading ballot...</p>
           </div>
         </main>
@@ -252,34 +252,34 @@ const Vote = () => {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="pt-24 px-4 pb-12">
+      <main className="pt-20 sm:pt-24 px-2 sm:px-4 pb-12">
         <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center p-4 bg-gradient-success rounded-full shadow-success-glow mb-4">
-              <VoteIcon className="w-8 h-8 text-success-foreground" />
+          <div className="text-center mb-6 sm:mb-8 animate-fade-in">
+            <div className="inline-flex items-center justify-center p-3 sm:p-4 bg-gradient-success rounded-full shadow-success-glow mb-4">
+              <VoteIcon className="w-6 h-6 sm:w-8 sm:h-8 text-success-foreground" />
             </div>
-            <h1 className="text-4xl font-bold mb-2 text-foreground">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 text-foreground">
               Cast Your Vote
             </h1>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-base sm:text-lg text-muted-foreground">
               Make your selection for each position
             </p>
             {voter?.email && (
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                 Voting as: {voter.email}
               </p>
             )}
           </div>
 
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {positions.map((position, index) => {
               const positionCandidates = candidates.filter((c) => c.position === position.name);
 
               return (
-                <Card key={position.id} className="p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-foreground">{position.name}</h2>
-                    <p className="text-sm text-muted-foreground">
+                <Card key={position.id} className="p-4 sm:p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
+                  <div className="mb-4 sm:mb-6">
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground">{position.name}</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {position.vote_type === "single" 
                         ? "Select one candidate" 
                         : `Select up to ${position.max_selections} candidate(s)`}
@@ -291,11 +291,11 @@ const Vote = () => {
                       value={selections[position.name]?.[0] || ""}
                       onValueChange={(value) => handleSingleSelection(position.name, value)}
                     >
-                      <div className="space-y-4">
+                      <div className="space-y-3 sm:space-y-4">
                         {positionCandidates.map((candidate) => (
                           <div
                             key={candidate.id}
-                            className={`flex items-center space-x-4 p-4 rounded-lg border ${
+                            className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-lg border ${
                               selections[position.name]?.includes(candidate.id)
                                 ? "border-primary bg-primary/5"
                                 : "border-border hover:border-primary/50"
@@ -303,7 +303,7 @@ const Vote = () => {
                             onClick={() => handleSingleSelection(position.name, candidate.id)}
                           >
                             <RadioGroupItem value={candidate.id} id={candidate.id} />
-                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
                               {candidate.picture_url ? (
                                 <img
                                   src={candidate.picture_url}
@@ -311,12 +311,12 @@ const Vote = () => {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <span className="text-2xl font-bold text-muted-foreground">
+                                <span className="text-lg sm:text-2xl font-bold text-muted-foreground">
                                   {candidate.full_name.charAt(0)}
                                 </span>
                               )}
                             </div>
-                            <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-lg font-semibold">
+                            <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-base sm:text-lg font-semibold">
                               {candidate.full_name}
                             </Label>
                           </div>
@@ -324,11 +324,11 @@ const Vote = () => {
                       </div>
                     </RadioGroup>
                   ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-4">
                       {positionCandidates.map((candidate) => (
                         <div
                           key={candidate.id}
-                          className={`flex items-center space-x-4 p-4 rounded-lg border ${
+                          className={`flex items-center space-x-3 sm:space-x-4 p-3 sm:p-4 rounded-lg border ${
                             selections[position.name]?.includes(candidate.id)
                               ? "border-primary bg-primary/5"
                               : "border-border hover:border-primary/50"
@@ -340,7 +340,7 @@ const Vote = () => {
                             checked={selections[position.name]?.includes(candidate.id)}
                             onCheckedChange={() => handleMultipleSelection(position.name, candidate.id, position)}
                           />
-                          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
                             {candidate.picture_url ? (
                               <img
                                 src={candidate.picture_url}
@@ -348,12 +348,12 @@ const Vote = () => {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-2xl font-bold text-muted-foreground">
+                              <span className="text-lg sm:text-2xl font-bold text-muted-foreground">
                                 {candidate.full_name.charAt(0)}
                               </span>
                             )}
                           </div>
-                          <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-lg font-semibold">
+                          <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-base sm:text-lg font-semibold">
                             {candidate.full_name}
                           </Label>
                         </div>
@@ -365,12 +365,12 @@ const Vote = () => {
             })}
           </div>
 
-          <Card className="p-6 mt-8 bg-muted/30">
-            <div className="flex items-start gap-3 mb-6">
-              <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+          <Card className="p-4 sm:p-6 mt-6 sm:mt-8 bg-muted/30">
+            <div className="flex items-start gap-3 mb-4 sm:mb-6">
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold mb-2 text-foreground">Before You Submit:</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
+                <h3 className="font-semibold mb-2 text-foreground text-sm sm:text-base">Before You Submit:</h3>
+                <ul className="text-xs sm:text-sm text-muted-foreground space-y-1">
                   <li>• Review all your selections carefully</li>
                   <li>• Once submitted, you cannot change your vote</li>
                   <li>• Your vote is completely anonymous</li>
@@ -382,16 +382,16 @@ const Vote = () => {
             <Button
               onClick={handleSubmitVote}
               disabled={isSubmitting}
-              className="w-full bg-gradient-success hover:shadow-success-glow text-lg py-6"
+              className="w-full bg-gradient-success hover:shadow-success-glow text-base sm:text-lg py-4 sm:py-6"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
                   Submitting Vote...
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
                   Submit My Vote
                 </>
               )}
