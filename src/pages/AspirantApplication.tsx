@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, ArrowLeft, ArrowRight, Upload, Download, MessageCircle, Loader2, CheckCircle2, AlertCircle, Lock, Save, FileText, Printer } from "lucide-react";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
+import ielcomform from "@/public/ielcomform.pdf";
 
 // FIX 1: Removed 'min_level' and 'max_level' from the interface 
 // to resolve the type mismatch with the Supabase query's return type.
@@ -256,7 +257,7 @@ const AspirantApplication = () => {
             // Check if the applicant's level is NOT included in the eligible list
             if (!eligibleLevels.includes(applicantLevel)) {
                 // Use a dedicated error key for eligibility
-                errors.position_level_error = `Your level (${applicantLevel}L) is not eligible for the position: ${selectedPosition.name}. Eligible levels: ${eligibleLevels.map(l => `${l}L`).join(', ')}`;
+                errors.position_level_error = `Your level (${applicantLevel}) is not eligible for the position: ${selectedPosition.name}. Eligible levels: ${eligibleLevels.map(l => `${l}`).join(', ')}`;
             }
         }
         const wordCount = applicationData.why_running.trim().split(/\s+/).length;
@@ -798,7 +799,7 @@ const AspirantApplication = () => {
                     <div className="mt-4 p-4 bg-muted/30 rounded-lg">
                       <p className="text-sm">
                         <strong>Position Requirement:</strong> Minimum CGPA of {selectedPosition.min_cgpa} for {selectedPosition.name} 
-                        and eligible for levels: {selectedPosition.eligible_levels.map(l => `${l}L`).join(', ')}
+                         and eligible for levels: {selectedPosition.eligible_levels.map(l => `${l}L`).join(', ')}
                       </p>
                       {applicationData.cgpa && parseFloat(applicationData.cgpa) >= selectedPosition.min_cgpa && (
                         <div className="flex items-center gap-2 mt-2 text-success">
@@ -818,7 +819,6 @@ const AspirantApplication = () => {
                       <ul className="text-blue-800 space-y-1">
                         <li>• Your most recent statement of result showing CGPA will be submitted on screening day</li>
                         <li>• Ensure your CGPA meets the minimum requirement for your chosen position</li>
-                        <li>• Academic transcripts must be official and recent</li>
                       </ul>
                     </div>
                   </div>
@@ -880,9 +880,6 @@ const AspirantApplication = () => {
                             Contact NUNSA Café
                           </Button>
                         </div>
-                        <p className="text-xs text-amber-700 mt-2">
-                          WhatsApp: 07040640646 for physical forms and assistance
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -900,9 +897,9 @@ const AspirantApplication = () => {
                     <h3 className="font-semibold text-green-900 mb-2">Payment Instructions</h3>
                     <div className="text-sm text-green-800 space-y-1">
                       <p><strong>Amount:</strong> ₦{selectedPosition.application_fee.toLocaleString()}</p>
-                      <p><strong>Account Number:</strong> 7081795658</p>
-                      <p><strong>Bank:</strong> OPAY</p>
-                      <p><strong>Account Name:</strong> Awwal Abubakar Sadik</p>
+                      <p><strong>Account Number:</strong> 9129196214 </p>
+                      <p><strong>Bank:</strong> MONIEPOINT </p>
+                      <p><strong>Account Name:</strong> Musa Zulaihat Dalhatu </p>
                     </div>
                   </Card>
                 )}
@@ -918,7 +915,7 @@ const AspirantApplication = () => {
                   />
                   {validationErrors.payment_proof && <p className="text-sm text-destructive">{validationErrors.payment_proof}</p>}
                   <p className="text-xs text-muted-foreground">
-                    Upload screenshot or receipt of payment (Image/PDF, max 2MB)
+                    Contact Treasurer before making payment and Upload screenshot or receipt of payment (Image/PDF, max 2MB)
                   </p>
                 </div>
 

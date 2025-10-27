@@ -91,10 +91,10 @@ const Navbar = () => {
           )}
 
           {/* Always show the View Results button */}
-          <Link to="/results">
+          <Link to="/Rules">
             <Button variant="default" size="sm" className="text-xs lg:text-sm">
-              <span className="hidden lg:inline">View Results</span>
-              <span className="lg:hidden">Results</span>
+              <span className="hidden lg:inline">View Electoral Rules</span>
+              <span className="lg:hidden">Electoral Rules</span>
             </Button>
           </Link>
         </div>
@@ -156,9 +156,9 @@ const Navbar = () => {
             )}
 
             {/* Always show the View Results button */}
-            <Link to="/results" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link to="/Rules" onClick={() => setIsMobileMenuOpen(false)}>
               <Button variant="default" size="sm" className="w-full justify-start">
-                View Results
+                Electoral Rules
               </Button>
             </Link>
           </div>
