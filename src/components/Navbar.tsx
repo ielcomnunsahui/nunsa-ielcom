@@ -128,7 +128,7 @@ const Navbar = () => {
                 </Link>
                 
                 {/* Voter Login Button */}
-                <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                <Link to="/voters-login" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
                     <User className="w-4 h-4" />
                     Voter Login
