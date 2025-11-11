@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, ArrowLeft, ArrowRight, Upload, Download, MessageCircle, Loader2, CheckCircle2, AlertCircle, Lock, Save, FileText, Printer } from "lucide-react";
 import { z } from "zod";
 import { User } from "@supabase/supabase-js";
-import ielcomform from "@/public/ielcomform.pdf";
 
 // FIX 1: Removed 'min_level' and 'max_level' from the interface 
 // to resolve the type mismatch with the Supabase query's return type.
@@ -105,7 +104,7 @@ const AspirantApplication = () => {
           description: "Please log in to access the application form.",
           variant: "destructive",
         });
-        navigate("/login", { state: { returnTo: "/aspirant/apply" } });
+        navigate("/VotersLogin", { state: { returnTo: "VotersLogin" } });
         return;
       }
 

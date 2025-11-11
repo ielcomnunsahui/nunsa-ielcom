@@ -18,7 +18,7 @@ const Hero = () => {
       <div className="container mx-auto relative z-10">
         <div className="max-w-4xl mx-auto text-center space-y-6 sm:space-y-8 animate-fade-in">
           {/* Logo/Badge - using placeholder URL for sandbox compilation */}
-          <div className="inline-flex items-center justify-center p-3 sm:p-4 w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 bg-gradient-primary rounded-full shadow-glow mb-4 animate-scale-in">
+          <div className="inline-flex items-center justify-center p-3 sm:p-4 w-20 h-28 sm:w-24 sm:h-24 lg:w-28 lg:h-28">
             {/* Using img tag with object-contain to ensure the logo scales correctly within the circular frame */}
             <img 
               src={NUNSALogo}
