@@ -85,7 +85,7 @@ const Index = () => {
       <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
           <p>© 2025 NUNSA Electoral System. All rights reserved.</p>
-          <p className="mt-2">Powered by Lovable Cloud • Built with security and transparency</p>
+          <p className="mt-2">Powered by ISECO 2025/2026 Academic Session • Built with security and transparency</p>
         </div>
       </footer>
     </div>

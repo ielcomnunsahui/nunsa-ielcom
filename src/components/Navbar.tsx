@@ -13,6 +13,7 @@ const Navbar = () => {
   const isProtectedPath = 
     location.pathname === "/voters-login" || 
     location.pathname === "/admin-login" || 
+    location.pathname === "/aspirant-login" ||
     location.pathname.startsWith("/aspirant"); 
     
   // Check if the current path is the Aspirant Dashboard page
@@ -38,7 +39,7 @@ const Navbar = () => {
             <h1 className="font-bold text-base sm:text-lg text-foreground group-hover:text-primary transition-colors">
               NUNSA IELCOM
             </h1>
-            <p className="text-xs text-muted-foreground hidden lg:block">NUNSA Independent Student Electoral Committee</p>
+            <p className="text-xs text-muted-foreground hidden lg:block">Al-Hikmah University Chapter</p>
           </div>
           <div className="sm:hidden">
             <h1 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
@@ -53,11 +54,11 @@ const Navbar = () => {
           {!isProtectedPath && (
             <>
               {/* Apply for Position Button */}
-              <Link to="/aspirant">
+              <Link to="/aspirant-login">
                 <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
                   <Trophy className="w-3 h-3 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Apply for Position</span>
-                  <span className="lg:hidden">Apply</span>
+                  <span className="hidden lg:inline">Aspirant Login</span>
+                  <span className="lg:hidden">Aspirant</span>
                 </Button>
               </Link>
               
@@ -66,7 +67,7 @@ const Navbar = () => {
                 <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
                   <User className="w-3 h-3 lg:w-4 lg:h-4" />
                   <span className="hidden lg:inline">Voter Login</span>
-                  <span className="lg:hidden">Login</span>
+                  <span className="lg:hidden">Vote</span>
                 </Button>
               </Link>
               
@@ -119,11 +120,11 @@ const Navbar = () => {
             {/* Show login/apply buttons only when not on a protected or internal page */}
             {!isProtectedPath && (
               <>
-                {/* Apply for Position Button */}
-                <Link to="/aspirant" onClick={() => setIsMobileMenuOpen(false)}>
+                {/* Aspirant Login Button */}
+                <Link to="/aspirant-login" onClick={() => setIsMobileMenuOpen(false)}>
                   <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
                     <Trophy className="w-4 h-4" />
-                    Apply for Position
+                    Aspirant Login
                   </Button>
                 </Link>
                 

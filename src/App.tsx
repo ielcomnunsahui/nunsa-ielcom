@@ -8,11 +8,13 @@ import Results from "./pages/Results";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
+import AspirantLogin from "./pages/AspirantLogin";
 import Vote from "./pages/Vote";
 import VotersLogin from "./pages/VotersLogin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import SetupAdmin from "./pages/SetupAdmin";
+import SupportPage from "./pages/SupportPage";
 import Rules from "./pages/Rules";
 import AspirantDashboard from "./pages/AspirantDashboard";
 import AspirantApplication from "./pages/AspirantApplication";
@@ -24,18 +26,20 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/results" element={<Results />} />
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin-login" element={<AdminLogin />} />
+          <Route path="/aspirant-login" element={<AspirantLogin />} />
           <Route path="/vote" element={<Vote />} />
           <Route path="/voters-login" element={<VotersLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
           <Route path="/Rules" element={<Rules />} />
+          <Route path="/Support" element={<SupportPage />} />
           {/* ASPIRANT ROUTES */}
           <Route path="/aspirant" element={<AspirantDashboard />} />
           <Route path="/aspirant/apply" element={<AspirantApplication />} />

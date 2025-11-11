@@ -7,10 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Loader2, LogIn, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn, UserPlus, Trophy } from "lucide-react";
 import Navbar from "@/components/Navbar";
 
-const Login = () => {
+const AspirantLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({
@@ -26,28 +26,18 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get the return URL from location state or default to home
-  const returnTo = location.state?.returnTo || "/";
+  // Get the return URL from location state or default to aspirant dashboard
+  const returnTo = location.state?.returnTo || "/aspirant";
 
   useEffect(() => {
     // Check if user is already logged in
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Check if user is admin
-        const { data: adminData } = await supabase
-          .from("admin_users")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (adminData) {
-          navigate("/admin");
-        } else {
+          // Regular user - redirect to aspirant dashboard
           navigate(returnTo);
         }
-      }
-    };
+      };
     checkUser();
   }, [navigate, returnTo]);
 
@@ -64,23 +54,13 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Check if user is admin
-        const { data: adminData } = await supabase
-          .from("admin_users")
-          .select("*")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
 
         toast({
           title: "Login Successful",
-          description: `Welcome back, ${data.user.email}!`,
+          description: `Welcome back to your aspirant dashboard!`,
         });
 
-        if (adminData) {
-          navigate("/admin");
-        } else {
-          navigate(returnTo);
-        }
+        navigate(returnTo);
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -129,7 +109,7 @@ const Login = () => {
       if (data.user) {
         toast({
           title: "Account Created",
-          description: "Your account has been created successfully. You can now log in.",
+          description: "Your aspirant account has been created successfully. You can now log in.",
         });
 
         // Clear signup form and switch to login tab
@@ -165,14 +145,14 @@ const Login = () => {
       <main className="pt-24 px-4 pb-12">
         <div className="container mx-auto max-w-md">
           <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center p-4 bg-gradient-primary rounded-full shadow-glow mb-4">
-              <Users className="w-8 h-8 text-primary-foreground" />
+            <div className="inline-flex items-center justify-center p-4 bg-gradient-secondary rounded-full shadow-glow mb-4">
+              <Trophy className="w-8 h-8 text-secondary-foreground" />
             </div>
             <h1 className="text-4xl font-bold mb-2 text-foreground">
-              General Login
+              Aspirant Portal
             </h1>
             <p className="text-lg text-muted-foreground">
-              Access your account for general platform features
+              Access your aspirant dashboard and manage your application
             </p>
           </div>
 
@@ -226,7 +206,7 @@ const Login = () => {
 
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-primary"
+                    className="w-full bg-gradient-secondary"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -237,7 +217,7 @@ const Login = () => {
                     ) : (
                       <>
                         <LogIn className="w-4 h-4 mr-2" />
-                        Log In
+                        Access Dashboard
                       </>
                     )}
                   </Button>
@@ -300,7 +280,7 @@ const Login = () => {
 
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-secondary"
+                    className="w-full bg-gradient-primary"
                     disabled={isLoading}
                   >
                     {isLoading ? (
@@ -311,7 +291,7 @@ const Login = () => {
                     ) : (
                       <>
                         <UserPlus className="w-4 h-4 mr-2" />
-                        Create Account
+                        Create Aspirant Account
                       </>
                     )}
                   </Button>
@@ -322,28 +302,25 @@ const Login = () => {
 
           <div className="text-center mt-6 space-y-2">
             <p className="text-sm text-muted-foreground">
-              Looking for specific access?
+              Are you a voter? <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/voters-login")}>
+                Vote here instead
+              </Button>
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/aspirant-login")}>
-                Aspirant Login
+            <p className="text-sm text-muted-foreground">
+              Administrator? <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/admin-login")}>
+                Admin login
               </Button>
-              <span className="hidden sm:inline text-muted-foreground">•</span>
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/voters-login")}>
-                Voter Login
-              </Button>
-              <span className="hidden sm:inline text-muted-foreground">•</span>
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/admin-login")}>
-                Admin Login
-              </Button>
-            </div>
+            </p>
           </div>
 
           <div className="mt-8 p-4 bg-muted/30 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2 text-foreground">Need Help?</h4>
-            <p className="text-xs text-muted-foreground">
-              Contact the electoral commission for assistance with your account or access issues.
-            </p>
+            <h4 className="font-semibold text-sm mb-2 text-foreground">Aspirant Portal Features</h4>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>• Submit and track your leadership position applications</li>
+              <li>• Monitor application status and screening progress</li>
+              <li>• Access position requirements and deadlines</li>
+              <li>• Receive updates on your candidacy journey</li>
+            </ul>
           </div>
         </div>
       </main>
@@ -351,4 +328,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default AspirantLogin;
