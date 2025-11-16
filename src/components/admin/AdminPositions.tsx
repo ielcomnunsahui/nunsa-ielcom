@@ -245,7 +245,7 @@ export function AdminPositions() {
         min_cgpa: 3.5,
         eligible_levels: ["200", "300"],
         description:
-          "Senior Public Relations Officer. Manage external communications and represent the union in public forums.",
+          "Manage external communications and represent the union in public forums.",
         is_open: true,
       },
       {
@@ -254,7 +254,7 @@ export function AdminPositions() {
         min_cgpa: 3.0,
         eligible_levels: ["200", "300"],
         description:
-          "Junior Public Relations Officer. Support public relations activities and assist in communication efforts.",
+          "Support public relations activities and assist in communication efforts.",
         is_open: true,
       },
     ];
@@ -541,25 +541,25 @@ export function AdminPositions() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Position Management</h2>
-        <p className="text-muted-foreground">
-          Manage voting positions and aspirant application positions. Ensure
-          positions are properly configured for both voting and application
-          processes.
-        </p>
-      </div>
-
-      <Tabs defaultValue="aspirant" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+      <div className="text-left md:text-left">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center md:justify-start">
+                  <Award className="w-8 h-8 mr-3 text-blue-600" />
+                  Position Management
+              </h1>
+              <p className="text-lg text-gray-600">
+               Manage voting positions and aspirant application positions.
+              </p>
+            </div>
+      <Tabs defaultValue="aspirant"  className="sm:max-w-[180px] lg:max-w-full max-h-[90vh] overflow-y-auto">
+        <TabsList className="flex w-full overflow-x-auto justify-start h-10 md:h-12 md:grid md:grid-cols-2 p-1 sm:p-0 bg-muted/50 sm:bg-transparent">
           <TabsTrigger value="aspirant">Aspirant Positions</TabsTrigger>
           <TabsTrigger value="voting">Voting Positions</TabsTrigger>
         </TabsList>
 
         {/* Aspirant Positions Tab - Made Primary */}
         <TabsContent value="aspirant" className="space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
+          <div className="space-y-2">
+            
               <h3 className="text-lg font-semibold">
                 Aspirant Application Positions
               </h3>
@@ -567,8 +567,8 @@ export function AdminPositions() {
                 Configure positions available for student applications with
                 requirements and fees
               </p>
-            </div>
-            <div className="flex gap-2">
+           
+            <div className="gap-2">
               {aspirantPositions.length === 0 && (
                 <Button onClick={initializeDefaultPositions} variant="outline">
                   <Trophy className="w-4 h-4 mr-2" />
@@ -761,7 +761,6 @@ export function AdminPositions() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <DollarSign className="w-3 h-3 text-muted-foreground" />
                           <span className="font-medium">
                             ₦{position.application_fee.toLocaleString()}
                           </span>
@@ -769,7 +768,7 @@ export function AdminPositions() {
                       </TableCell>
                       <TableCell>{position.min_cgpa.toFixed(1)}</TableCell>
                       <TableCell>
-                        {position.eligible_levels.map(l => `${l}L`).join(', ')}
+                        {position.eligible_levels.map(l => `${l}`).join(', ')}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -817,7 +816,7 @@ export function AdminPositions() {
 
         {/* Voting Positions Tab */}
         <TabsContent value="voting" className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="space-y-2">
             <div>
               <h3 className="text-lg font-semibold">Voting Positions</h3>
               <p className="text-sm text-muted-foreground">
@@ -826,7 +825,7 @@ export function AdminPositions() {
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={openAddDialog}>
+                <Button onClick={openAddDialog} variant="secondary">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Voting Position
                 </Button>

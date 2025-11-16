@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Loader2, Eye, CheckCircle2, XCircle, Clock, Calendar, UserCheck, Download, TrophyIcon, Image, CreditCard, Search, Filter, AlertCircle, Edit, Trash2, Save, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,11 +9,61 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Eye, CheckCircle2, XCircle, Clock, Calendar, UserCheck, Download, FileText, Image, CreditCard, Search, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+// NEW HELPER FUNCTION: Safely formats a date string for display
+// Now includes an option to omit the time.
+const formatDisplayDate = (dateString: string | null | undefined, includeTime = true): string => {
+    if (!dateString) return "N/A";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+        return "Invalid Date";
+    }
+    return date.toLocaleDateString("en-US", {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        // Only include hour and minute if includeTime is true
+        ...(includeTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+    });
+};
+
+// NEW HELPER FUNCTION: Generates a WhatsApp deep link
+const generateWhatsappLink = (phone: string, message: string): string => {
+    // Format phone to a clean standard (e.g., removing non-digits and ensuring country code or leading 234)
+    const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '234');
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+};
+
+// HELPER FUNCTION: Get status badge variant and custom Tailwind class for color.
+const getStatusBadge = (status: string) => {
+    // ... (rest of the getStatusBadge logic remains the same)
+    switch (status) {
+        // Pending: Uses default variant with a custom yellow color class
+        case "pending": return { text: "Pending Payment", variant: "default" as const, icon: <Clock className="w-3 h-3 mr-1" />, className: "bg-yellow-500/10 text-yellow-600 border-yellow-300" };
+        // Payment Verified: Uses secondary variant with a custom indigo color class
+        case "payment_verified": return { text: "Payment Verified", variant: "secondary" as const, icon: <CreditCard className="w-3 h-3 mr-1" />, className: "bg-indigo-500/10 text-indigo-600 border-indigo-300" };
+        // Under Review: Uses outline variant with a custom blue color class
+        case "under_review": return { text: "Under Review", variant: "outline" as const, icon: <UserCheck className="w-3 h-3 mr-1" />, className: "text-blue-600 border-blue-300" };
+        // Screening Scheduled: Uses default variant with a custom blue color class
+        case "screening_scheduled": return { text: "Screening Scheduled", variant: "default" as const, icon: <Calendar className="w-3 h-3 mr-1" />, className: "bg-blue-500/10 text-blue-600 border-blue-300" };
+        // Qualified: Uses default variant with a custom green color class (Success)
+        case "qualified": return { text: "Qualified", variant: "default" as const, icon: <CheckCircle2 className="w-3 h-3 mr-1" />, className: "bg-green-500/10 text-green-700 border-green-300" };
+        // Disqualified/Rejected: Uses destructive variant
+        case "disqualified": return { text: "Disqualified", variant: "destructive" as const, icon: <XCircle className="w-3 h-3 mr-1" />, className: "" };
+        case "rejected": return { text: "Rejected", variant: "destructive" as const, icon: <XCircle className="w-3 h-3 mr-1" />, className: "" };
+        // Conditional: Uses outline variant with a custom orange color class (Warning)
+        case "conditional_acceptance": return { text: "Conditional", variant: "outline" as const, icon: <AlertCircle className="w-3 h-3 mr-1" />, className: "bg-orange-500/10 text-orange-600 border-orange-300" };
+        // Promoted: Uses default variant with a custom purple color class
+        case "promoted_to_candidate": return { text: "Candidate", variant: "default" as const, icon: <UserCheck className="w-3 h-3 mr-1" />, className: "bg-purple-500/10 text-purple-700 border-purple-300" };
+        default: return { text: status, variant: "secondary" as const, icon: null, className: "" };
+    }
+};
 
 interface Aspirant {
   id: string;
@@ -22,7 +73,7 @@ interface Aspirant {
   phone: string;
   department: string;
   level: string;
-  dob: string;
+  date_of_birth: string; // Stored as a date string, e.g., '1990-11-14'
   gender: string;
   cgpa: number;
   position_id: string;
@@ -67,6 +118,7 @@ export function AdminAspirants() {
   const [filteredAspirants, setFilteredAspirants] = useState<Aspirant[]>([]);
   const [stats, setStats] = useState<AspirantStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [selectedAspirant, setSelectedAspirant] = useState<Aspirant | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,31 +137,36 @@ export function AdminAspirants() {
   const { toast } = useToast();
 
   const fetchAspirants = useCallback(async () => {
+    setIsLoading(true);
     try {
+      // Fetch data and statistics concurrently
       const [aspirantsResult, statsResult] = await Promise.all([
         supabase
           .from("aspirants")
-          .select(`
+          .select(
+            `
             *,
             aspirant_positions (
               name,
               application_fee
             )
-          `)
+          `
+          )
           .order("created_at", { ascending: false }),
-        supabase.rpc("get_aspirant_statistics")
+        (supabase.rpc as any)("get_aspirant_statistics"),
       ]);
 
       if (aspirantsResult.error) throw aspirantsResult.error;
       if (statsResult.error) throw statsResult.error;
 
-      setAspirants(aspirantsResult.data as unknown as Aspirant[] || []);
-      setStats(statsResult.data);
+      setAspirants(aspirantsResult.data as Aspirant[]);
+      setStats(statsResult.data as AspirantStats);
+
     } catch (error) {
       console.error("Error fetching aspirants:", error);
       toast({
         title: "Error",
-        description: "Failed to load aspirants",
+        description: "Failed to fetch aspirant data.",
         variant: "destructive",
       });
     } finally {
@@ -117,76 +174,95 @@ export function AdminAspirants() {
     }
   }, [toast]);
 
+  // Initial fetch
   useEffect(() => {
     fetchAspirants();
   }, [fetchAspirants]);
 
-  // Filter aspirants based on search and status
+  // Filtering Logic
   useEffect(() => {
-    let filtered = aspirants;
+    const filtered = aspirants.filter(aspirant => {
+      // Search term filter
+      const matchesSearch = searchTerm === "" ||
+        aspirant.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        aspirant.matric.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        aspirant.aspirant_positions?.name.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Apply search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (aspirant) =>
-          aspirant.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          aspirant.matric.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          aspirant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          aspirant.aspirant_positions?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+      // Status filter logic
+      let status;
+      if (aspirant.promoted_to_candidate) {
+          status = "promoted";
+      } else if (aspirant.screening_result) {
+          status = aspirant.screening_result;
+      } else if (aspirant.screening_scheduled_at) {
+          status = "screening_scheduled";
+      } else if (aspirant.admin_review_status === "rejected" || aspirant.screening_result === "disqualified") {
+          status = "rejected";
+      } else if (aspirant.payment_verified) {
+          status = "payment_verified";
+      } else {
+          status = "pending";
+      }
+      
+      const matchesStatus = statusFilter === "all" || statusFilter === status;
 
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((aspirant) => {
-        switch (statusFilter) {
-          case "pending":
-            return !aspirant.payment_verified && !aspirant.promoted_to_candidate;
-          case "review":
-            return aspirant.payment_verified && !aspirant.screening_scheduled_at && !aspirant.promoted_to_candidate;
-          case "screening":
-            return aspirant.screening_scheduled_at && !aspirant.screening_result && !aspirant.promoted_to_candidate;
-          case "qualified":
-            return aspirant.screening_result === "qualified" && !aspirant.promoted_to_candidate;
-          case "promoted":
-            return aspirant.promoted_to_candidate;
-          case "rejected":
-            return aspirant.admin_review_status === "rejected" || aspirant.screening_result === "disqualified";
-          default:
-            return true;
-        }
-      });
-    }
+      return matchesSearch && matchesStatus;
+    });
 
     setFilteredAspirants(filtered);
   }, [aspirants, searchTerm, statusFilter]);
 
-  const openAspirantDialog = (aspirant: Aspirant) => {
+  // Handle Dialog Open
+  const handleOpenDialog = (aspirant: Aspirant) => {
     setSelectedAspirant(aspirant);
     setActionData({
       payment_verified: aspirant.payment_verified,
       admin_review_status: aspirant.admin_review_status || "",
       admin_review_notes: aspirant.admin_review_notes || "",
-      screening_scheduled_at: aspirant.screening_scheduled_at ? 
-        new Date(aspirant.screening_scheduled_at).toISOString().slice(0, 16) : "",
+      screening_scheduled_at: aspirant.screening_scheduled_at ? new Date(aspirant.screening_scheduled_at).toISOString().slice(0, 16) : "",
       screening_result: aspirant.screening_result || "",
       screening_notes: aspirant.screening_notes || "",
       conditional_acceptance: aspirant.conditional_acceptance,
       conditional_reason: aspirant.conditional_reason || "",
-      resubmission_deadline: aspirant.resubmission_deadline ? 
-        new Date(aspirant.resubmission_deadline).toISOString().slice(0, 16) : "",
+      resubmission_deadline: aspirant.resubmission_deadline ? new Date(aspirant.resubmission_deadline).toISOString().slice(0, 16) : "",
     });
     setIsDialogOpen(true);
   };
 
+  // Handle Aspirant Update (Admin Review)
   const handleUpdateAspirant = async () => {
     if (!selectedAspirant) return;
+    setUpdating(true);
+
+    let newStatus = selectedAspirant.status;
+
+    // Logic to derive the new 'status' field based on admin actions
+    if (actionData.admin_review_status === "rejected") {
+        newStatus = "rejected";
+    } else if (actionData.conditional_acceptance) {
+        newStatus = "conditional_acceptance";
+    } else if (actionData.screening_result === "qualified" || actionData.screening_result === "disqualified") {
+        newStatus = actionData.screening_result;
+    } else if (actionData.screening_scheduled_at) {
+        newStatus = "screening_scheduled";
+    } else if (actionData.payment_verified) {
+        newStatus = "payment_verified";
+    } else {
+        newStatus = "pending";
+    }
 
     try {
       const updateData = {
-        ...actionData,
+        payment_verified: actionData.payment_verified,
+        admin_review_status: actionData.admin_review_status,
+        admin_review_notes: actionData.admin_review_notes || null,
         screening_scheduled_at: actionData.screening_scheduled_at || null,
+        screening_result: actionData.screening_result || null,
+        screening_notes: actionData.screening_notes || null,
+        conditional_acceptance: actionData.conditional_acceptance,
+        conditional_reason: actionData.conditional_reason || null,
         resubmission_deadline: actionData.resubmission_deadline || null,
+        status: newStatus, // Update the status column
       };
 
       const { error } = await supabase
@@ -198,597 +274,624 @@ export function AdminAspirants() {
 
       toast({
         title: "Success",
-        description: "Aspirant updated successfully",
+        description: `${selectedAspirant.full_name}'s application updated.`,
       });
-
-      setIsDialogOpen(false);
       fetchAspirants();
+      setIsDialogOpen(false);
+
     } catch (error) {
-      console.error("Error updating aspirant:", error);
+      console.error("Update error:", error);
       toast({
-        title: "Error",
-        description: "Failed to update aspirant",
+        title: "Update Failed",
+        description: "Could not update the aspirant record.",
         variant: "destructive",
       });
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const promoteToCandidate = async (aspirantId: string) => {
-    if (!confirm("Promote this aspirant to candidate? This action cannot be undone.")) return;
+  const promoteToCandidate = async (aspirant: Aspirant) => {
+    if (aspirant.status !== 'qualified' && aspirant.screening_result !== 'qualified') {
+        toast({
+            title: "Action Restricted",
+            description: "Only 'Qualified' aspirants can be promoted to Candidate.",
+            variant: "default", 
+        });
+        return;
+    }
 
+    if (!confirm(`Are you sure you want to promote ${aspirant.full_name} to a Candidate? This action cannot be undone.`)) return;
+
+    setUpdating(true);
     try {
-      // Get aspirant details
-      const { data: aspirant, error: fetchError } = await supabase
-        .from("aspirants")
-        .select("*, aspirant_positions(name)")
-        .eq("id", aspirantId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      // Create candidate
+      // 1. Create a record in the 'candidates' table
       const { data: candidate, error: candidateError } = await supabase
         .from("candidates")
         .insert({
           full_name: aspirant.full_name,
-          position: aspirant.aspirant_positions?.name,
+          matric: aspirant.matric,
+          position: aspirant.aspirant_positions?.name || "Unknown Position",
           picture_url: aspirant.photo_url,
+          manifesto: aspirant.why_running || null, 
+          // You might need to set the voting_position_id here if your schema requires it
         })
         .select()
         .single();
 
       if (candidateError) throw candidateError;
 
-      // Update aspirant
+      // 2. Update the aspirant record
       const { error: updateError } = await supabase
         .from("aspirants")
         .update({
           promoted_to_candidate: true,
           promoted_at: new Date().toISOString(),
-          candidate_id: candidate.id,
+          candidate_id: candidate.id, // Link to the new candidate record
+          status: "promoted_to_candidate",
         })
-        .eq("id", aspirantId);
+        .eq("id", aspirant.id);
 
       if (updateError) throw updateError;
 
       toast({
-        title: "Success",
-        description: "Aspirant promoted to candidate successfully",
+        title: "Promotion Successful",
+        description: `${aspirant.full_name} has been promoted to a Candidate.`,
+        variant: "default", 
       });
-
       fetchAspirants();
+      setIsDialogOpen(false);
+
     } catch (error) {
-      console.error("Error promoting aspirant:", error);
+      console.error("Promotion error:", error);
       toast({
-        title: "Error",
-        description: "Failed to promote aspirant",
+        title: "Promotion Failed",
+        description: "Failed to promote aspirant to candidate. Check console for details.",
         variant: "destructive",
       });
+    } finally {
+      setUpdating(false);
     }
   };
 
-  const exportAspirantsData = async () => {
-    try {
-      const csvContent = [
-        // CSV Header
-        "Name,Matric,Email,Phone,Department,Level,CGPA,Position,Payment Verified,Review Status,Screening Result,Promoted,Application Date",
-        // CSV Data
-        ...filteredAspirants.map(aspirant => [
-          aspirant.full_name,
-          aspirant.matric,
-          aspirant.email,
-          aspirant.phone,
-          aspirant.department,
-          aspirant.level,
-          aspirant.cgpa,
-          aspirant.aspirant_positions?.name || "",
-          aspirant.payment_verified ? "Yes" : "No",
-          aspirant.admin_review_status || "Pending",
-          aspirant.screening_result || "Not Screened",
-          aspirant.promoted_to_candidate ? "Yes" : "No",
-          new Date(aspirant.created_at).toLocaleDateString()
-        ].join(","))
-      ].join("\n");
 
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `aspirants_export_${new Date().toISOString().split('T')[0]}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+  // --- Render Functions ---
 
-      toast({
-        title: "Export Complete",
-        description: "Aspirants data exported successfully",
-      });
-    } catch (error) {
-      console.error("Error exporting data:", error);
-      toast({
-        title: "Export Failed",
-        description: "Failed to export aspirants data",
-        variant: "destructive",
-      });
-    }
-  };
+  const renderStatsCard = (title: string, count: number, icon: React.ReactNode) => (
+    <Card className="shadow-sm transition-all hover:shadow-md">
+      <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-500">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent className="p-4 pt-0">
+        <div className="text-2xl font-bold">{count}</div>
+      </CardContent>
+    </Card>
+  );
 
-  const getStatusBadge = (aspirant: Aspirant) => {
-    if (aspirant.promoted_to_candidate) {
-      return <Badge className="bg-success">Promoted</Badge>;
-    }
-    if (aspirant.conditional_acceptance) {
-      return <Badge variant="secondary">Conditional</Badge>;
-    }
-    if (aspirant.screening_result === "qualified") {
-      return <Badge className="bg-success">Qualified</Badge>;
-    }
-    if (aspirant.screening_result === "disqualified") {
-      return <Badge variant="destructive">Disqualified</Badge>;
-    }
-    if (aspirant.screening_scheduled_at) {
-      return <Badge variant="default">Screening Scheduled</Badge>;
-    }
-    if (aspirant.admin_review_status === "approved") {
-      return <Badge variant="default">Approved</Badge>;
-    }
-    if (aspirant.admin_review_status === "rejected") {
-      return <Badge variant="destructive">Rejected</Badge>;
-    }
-    if (aspirant.payment_verified) {
-      return <Badge className="bg-primary/80">Payment Verified</Badge>;
-    }
-    return <Badge variant="outline">Pending</Badge>;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+  const DocumentLink = ({ title, url, icon, viewFullOption = false }: { title: string; url: string | null; icon: React.ReactNode; viewFullOption?: boolean }) => (
+    <div className="flex items-center justify-between p-3 border rounded-md">
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="font-medium text-sm">{title}</span>
       </div>
-    );
-  }
-
-  const pendingPayment = aspirants.filter(a => !a.payment_verified && !a.promoted_to_candidate);
-  const underReview = aspirants.filter(a => a.payment_verified && !a.screening_scheduled_at && !a.promoted_to_candidate);
-  const screening = aspirants.filter(a => a.screening_scheduled_at && !a.screening_result && !a.promoted_to_candidate);
-  const qualified = aspirants.filter(a => a.screening_result === "qualified" && !a.promoted_to_candidate);
-  const promoted = aspirants.filter(a => a.promoted_to_candidate);
-  const rejected = aspirants.filter(a => a.admin_review_status === "rejected" || a.screening_result === "disqualified");
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Aspirant Management</h2>
-          <p className="text-muted-foreground">Manage applications, payments, screening, and candidate promotion</p>
-        </div>
-        <Button onClick={exportAspirantsData} variant="outline" className="gap-2">
-          <Download className="w-4 h-4" />
-          Export Data
+      {url ? (
+        <Button
+          variant={viewFullOption ? "default" : "outline"}
+          size="sm"
+          onClick={() => window.open(url, '_blank')}
+        >
+          <Eye className="w-4 h-4 mr-1" />
+          
         </Button>
-      </div>
-
-      {/* Statistics Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Applications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total_applications}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pending Payment</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{stats.pending_payment}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Under Review</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.under_review}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Qualified</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.qualified}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Promoted</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">{stats.promoted_to_candidate}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.rejected}</div>
-            </CardContent>
-          </Card>
-        </div>
+      ) : (
+        <span className="text-sm text-muted-foreground">Not Uploaded</span>
       )}
+    </div>
+  );
 
-      {/* Search and Filter */}
-      <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, matric, email, or position..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+  const AspirantDetailsDialog = ({ aspirant }: { aspirant: Aspirant }) => {
+    const currentStatus = aspirant.promoted_to_candidate ? "promoted_to_candidate"
+        : aspirant.screening_result ? aspirant.screening_result
+        : aspirant.screening_scheduled_at ? "screening_scheduled"
+        : aspirant.conditional_acceptance ? "conditional_acceptance"
+        : aspirant.payment_verified ? "payment_verified"
+        : "pending";
+
+    const statusInfo = getStatusBadge(currentStatus);
+
+    // WhatsApp Message Logic
+    const scheduledDate = actionData.screening_scheduled_at ? formatDisplayDate(actionData.screening_scheduled_at, false) : "[Date]";
+    const scheduledTime = actionData.screening_scheduled_at ? new Date(actionData.screening_scheduled_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : "[Time]";
+
+    const schedulingMessage = `Dear ${aspirant.full_name}, your screening for the position of ${aspirant.aspirant_positions?.name} has been scheduled.
+Date: ${scheduledDate}
+Time: ${scheduledTime}
+Venue: [Specify Venue, e.g., NUNSA Secretariat]
+Please prepare all required documents and be punctual.`;
+    const schedulingLink = generateWhatsappLink(aspirant.phone, schedulingMessage);
+
+    const qualifiedMessage = `Congratulations ${aspirant.full_name}, your screening for the position of ${aspirant.aspirant_positions?.name} was successful! You have been qualified to proceed as a candidate.`;
+    const qualifiedLink = generateWhatsappLink(aspirant.phone, qualifiedMessage);
+
+    const disqualifiedMessage = `Dear ${aspirant.full_name}, we regret to inform you that your screening for the position of ${aspirant.aspirant_positions?.name} was unsuccessful. You have been disqualified. Review notes: ${actionData.screening_notes || 'N/A'}`;
+    const disqualifiedLink = generateWhatsappLink(aspirant.phone, disqualifiedMessage);
+
+    const rescreeningMessage = `Dear ${aspirant.full_name}, your screening for the position of ${aspirant.aspirant_positions?.name} requires a re-screening due to [Reason for re-screening, e.g., missing document, panel request]. Please contact the Electoral Committee on [Electoral Committee Phone No.] to reschedule as soon as possible.`;
+    const rescreeningLink = generateWhatsappLink(aspirant.phone, rescreeningMessage);
+
+
+    return (
+      <DialogContent className="sm:max-w-[425px] lg:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            Application Review
+          <Badge variant={statusInfo.variant} className={`w-fit mt-2 ${statusInfo.className}`}>
+            {statusInfo.icon} {statusInfo.text}
+          </Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <Tabs defaultValue="info" className="w-full mt-4">
+          <TabsList className="grid w-full grid-cols-1 lg:grid-cols-3 h-auto">
+            <TabsTrigger value="info">Applicant Info</TabsTrigger> {/* 1st Tab: Applicant Info */}
+            <TabsTrigger value="review">Admin Review</TabsTrigger> {/* 2nd Tab: Admin Review */}
+            <TabsTrigger value="screening">Screening</TabsTrigger> {/* 3rd Tab: Screening */}{/* 4th Tab: Other Documents */}
+          </TabsList>
+
+          {/* --- TAB 1: Applicant Info --- */}
+          <TabsContent value="info" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Personal & Academic Info</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                {/* Aspirant Photo (New Requirement) */}
+                <div className="md:col-span-1 space-y-2">
+                    <h4 className="font-semibold text-base">Aspirant Photo</h4>
+                    {aspirant.photo_url ? (
+                        <div className="aspect-square w-full max-w-[200px] border rounded-md overflow-hidden">
+                            <img
+                                src={aspirant.photo_url}
+                                alt={`${aspirant.full_name}'s photo`}
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    ) : ( 
+                        <div className="aspect-square w-full max-w-[200px] border rounded-md flex items-center justify-center text-muted-foreground">
+                            <Image className="w-8 h-8" />
+                        </div>
+                    )}
+                    
+                        <DocumentLink
+                            title="View Full Photo"
+                            url={aspirant.photo_url}
+                            icon={<Eye className="w-5 h-5" />}
+                            viewFullOption={true} // View full picture option
+                    />
+                </div>
+
+                {/* Personal Details */}
+                <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <p><strong>Full Name:</strong> {aspirant.full_name}</p>
+                        <p><strong>Matric Number:</strong> {aspirant.matric}</p>
+                        <p><strong>Level:</strong> {aspirant.level}</p>
+                        <p><strong>Department:</strong> {aspirant.department}</p>
+                        <p><strong>CGPA:</strong> <Badge variant="outline">{aspirant.cgpa?.toFixed(2)}</Badge></p>
+                        <p><strong>Position:</strong> {aspirant.aspirant_positions?.name}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <p><strong>Email:</strong> {aspirant.email}</p>
+                        <p><strong>Phone:</strong> {aspirant.phone}</p>
+                        {/* DoB Format: day, month, and year (New Requirement) */}
+                        <p><strong>Date of Birth:</strong> {formatDisplayDate(aspirant.date_of_birth, false)}</p> 
+                        <p><strong>Gender:</strong> {aspirant.gender}</p>
+                        <p><strong>Applied On:</strong> {formatDisplayDate(aspirant.created_at)}</p>
+                        <p><strong>Status:</strong> {aspirant.status}</p>
+                    </div>
+                </div>
+
+                <div className="md:col-span-3 space-y-4 mt-4">
+                    <div className="space-y-2">
+                        <h4 className="font-semibold text-base border-b pb-1">Why Running?</h4>
+                        <p className="text-muted-foreground italic whitespace-pre-wrap">{aspirant.why_running}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="font-semibold text-base border-b pb-1">Leadership History</h4>
+                        <p className="text-muted-foreground italic whitespace-pre-wrap">{aspirant.leadership_history}</p>
+                    </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* --- TAB 2: Admin Review (Including Payment Proof) --- */}
+          <TabsContent value="review" className="mt-4 space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Payment & Initial Review</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* Payment Proof Document (New Requirement) */}
+                    <div className="space-y-2 pb-4 border-b">
+                        <h4 className="font-semibold text-base">Payment Proof Document</h4>
+                        <DocumentLink
+                            title="Proof of Application Fee Payment"
+                            url={aspirant.payment_proof_url}
+                            icon={<CreditCard className="w-5 h-5" />}
+                            viewFullOption={true} // View full picture option
+                        />
+                    </div>
+                    
+                    {/* Payment Verification Switch */}
+                    <div className="flex items-center justify-between p-3 border rounded-md">
+                        <Label htmlFor="payment_verified" className="flex items-center gap-2 text-sm font-medium">
+                            <CreditCard className="w-4 h-4 text-blue-600" />
+                            Verify Application Fee Payment (₦{aspirant.aspirant_positions?.application_fee?.toLocaleString() || 'N/A'})
+                        </Label>
+                        <Switch
+                            id="payment_verified"
+                            checked={actionData.payment_verified}
+                            onCheckedChange={(v) => setActionData({ ...actionData, payment_verified: v })}
+                            disabled={aspirant.promoted_to_candidate}
+                        />
+                    </div>
+
+                    {/* Admin Review Status */}
+                    <div className="space-y-2">
+                        <Label htmlFor="admin_review_status">Admin Review Status</Label>
+                        <Select
+                            value={actionData.admin_review_status}
+                            onValueChange={(v) => setActionData({ ...actionData, admin_review_status: v, conditional_acceptance: v === 'conditional_acceptance' })}
+                            disabled={aspirant.promoted_to_candidate}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="approved">Approved for Screening</SelectItem>
+                                <SelectItem value="conditional_acceptance">Conditional Acceptance</SelectItem>
+                                <SelectItem value="rejected">Rejected</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="admin_review_notes">Admin Notes</Label>
+                        <Textarea
+                            id="admin_review_notes"
+                            value={actionData.admin_review_notes || ''}
+                            onChange={(e) => setActionData({ ...actionData, admin_review_notes: e.target.value })}
+                            placeholder="Enter notes for the aspirant..."
+                            rows={3}
+                            disabled={aspirant.promoted_to_candidate}
+                        />
+                    </div>
+
+                    {/* Conditional fields for Conditional Acceptance */}
+                    {(actionData.admin_review_status === "conditional_acceptance" || actionData.conditional_acceptance) && (
+                        <div className="space-y-4 border-t pt-4">
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertTitle>Conditional Acceptance Details</AlertTitle>
+                                <AlertDescription>
+                                    Require the aspirant to resubmit certain documents or correct information.
+                                </AlertDescription>
+                            </Alert>
+                            <div className="space-y-2">
+                                <Label htmlFor="conditional_reason">Conditional Reason *</Label>
+                                <Textarea
+                                    id="conditional_reason"
+                                    value={actionData.conditional_reason || ''}
+                                    onChange={(e) => setActionData({ ...actionData, conditional_reason: e.target.value })}
+                                    placeholder="Explain what needs to be resubmitted..."
+                                    rows={3}
+                                    required
+                                    disabled={aspirant.promoted_to_candidate}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="resubmission_deadline">Resubmission Deadline</Label>
+                                <Input
+                                    id="resubmission_deadline"
+                                    type="datetime-local"
+                                    value={actionData.resubmission_deadline}
+                                    onChange={(e) => setActionData({ ...actionData, resubmission_deadline: e.target.value })}
+                                    disabled={aspirant.promoted_to_candidate}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* --- TAB 3: Screening --- */}
+          <TabsContent value="screening" className="mt-4 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Screening Details & Communication</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="screening_scheduled_at">Screening Date & Time</Label>
+                  <Input
+                    id="screening_scheduled_at"
+                    type="datetime-local"
+                    value={actionData.screening_scheduled_at}
+                    onChange={(e) => setActionData({ ...actionData, screening_scheduled_at: e.target.value })}
+                    disabled={aspirant.promoted_to_candidate}
+                  />
+                  <p className="text-xs text-muted-foreground">If a time is set, the status becomes 'Screening Scheduled'.</p>
+                  
+                  {/* WhatsApp message for scheduling (New Requirement) */}
+                  <Button
+                    asChild
+                    variant="link"
+                    className="p-0 h-auto text-green-600 hover:text-green-700"
+                    disabled={!actionData.screening_scheduled_at}
+                  >
+                    <a href={schedulingLink} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="w-4 h-4 mr-1" />
+                        Send WhatsApp Message (Scheduled)
+                    </a>
+                  </Button>
+                </div>
+
+                <div className="space-y-2 border-t pt-4">
+                  <Label htmlFor="screening_result">Screening Result</Label>
+                  <Select
+                    value={actionData.screening_result}
+                    onValueChange={(v) => setActionData({ ...actionData, screening_result: v })}
+                    disabled={aspirant.promoted_to_candidate}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select result" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="qualified">Qualified</SelectItem>
+                      <SelectItem value="disqualified">Disqualified</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="screening_notes">Screening Notes (Internal)</Label>
+                  <Textarea
+                    id="screening_notes"
+                    value={actionData.screening_notes || ''}
+                    onChange={(e) => setActionData({ ...actionData, screening_notes: e.target.value })}
+                    placeholder="Enter notes from the screening panel..."
+                    rows={3}
+                    disabled={aspirant.promoted_to_candidate}
+                  />
+                </div>
+                
+                {/* WhatsApp message for results (New Requirement) */}
+                <div className="flex flex-col sm:flex-row gap-2 border-t pt-4">
+                    <Button
+                        asChild
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                        disabled={actionData.screening_result !== 'qualified'}
+                    >
+                        <a href={qualifiedLink} target="_blank" rel="noopener noreferrer">
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            WhatsApp (Qualified)
+                        </a>
+                    </Button>
+                    <Button
+                        asChild
+                        variant="destructive"
+                        className="w-full sm:w-auto"
+                        disabled={actionData.screening_result !== 'disqualified'}
+                    >
+                        <a href={disqualifiedLink} target="_blank" rel="noopener noreferrer">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            WhatsApp (Disqualified)
+                        </a>
+                    </Button>
+                    <Button
+                        asChild
+                        variant="outline"
+                        className="w-full sm:w-auto text-orange-600 border-orange-300"
+                        disabled={!!actionData.screening_result} // Disable if a final result is set
+                    >
+                        <a href={rescreeningLink} target="_blank" rel="noopener noreferrer">
+                            <AlertCircle className="w-4 h-4 mr-1" />
+                            WhatsApp (Require Re-screening)
+                        </a>
+                    </Button>
+                </div>
+
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+        </Tabs>
+
+        <div className="flex flex-col sm:flex-row justify-between pt-4 border-t mt-6 gap-2">
+          <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+            Close
+          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+             <Button
+                onClick={() => promoteToCandidate(aspirant)}
+                disabled={updating || aspirant.promoted_to_candidate || aspirant.screening_result !== 'qualified'}
+                variant="default"
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+            >
+                {aspirant.promoted_to_candidate ? (
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                ) : (
+                    <UserCheck className="w-4 h-4 mr-2" />
+                )}
+                {aspirant.promoted_to_candidate ? 'Promoted' : 'Promote to Candidate'}
+            </Button>
+            <Button
+              onClick={handleUpdateAspirant}
+              disabled={updating || aspirant.promoted_to_candidate}
+              className="w-full sm:w-auto"
+            >
+              {updating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Changes
+            </Button>
+          </div>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Applications</SelectItem>
-            <SelectItem value="pending">Pending Payment</SelectItem>
-            <SelectItem value="review">Under Review</SelectItem>
-            <SelectItem value="screening">Screening</SelectItem>
-            <SelectItem value="qualified">Qualified</SelectItem>
-            <SelectItem value="promoted">Promoted</SelectItem>
-            <SelectItem value="rejected">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
+      </DialogContent>
+    );
+  };
+
+  // ... (rest of the component remains the same)
+
+  const totalApplications = stats?.total_applications || 0;
+  const underReview = stats?.under_review || 0;
+  const qualified = stats?.qualified || 0;
+  const promoted = stats?.promoted_to_candidate || 0;
+  const paymentVerified = stats?.payment_verified || 0;
+  
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+      <div className="text-left md:text-left">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center md:justify-start">
+                  <TrophyIcon className="w-8 h-8 mr-3 text-blue-600" />
+                  Aspirant Management
+              </h1>
+              <p className="text-lg text-gray-600">
+                Track and review applications for all positions
+              </p>
+            </div>
+     
+
+      {/* --- STATS CARDS --- */}
+      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {renderStatsCard("Total Applications", totalApplications, <Download className="w-4 h-4 text-muted-foreground" />)}
+        {renderStatsCard("Payment Verified", paymentVerified, <CreditCard className="w-4 h-4 text-green-600" />)}
+        {renderStatsCard("Under Review", underReview, <Clock className="w-4 h-4 text-blue-600" />)}
+        {renderStatsCard("Qualified", qualified, <CheckCircle2 className="w-4 h-4 text-green-600" />)}
+        {renderStatsCard("Promoted (Candidates)", promoted, <UserCheck className="w-4 h-4 text-purple-600" />)}
       </div>
 
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all">All ({filteredAspirants.length})</TabsTrigger>
-          <TabsTrigger value="pending">Pending ({pendingPayment.length})</TabsTrigger>
-          <TabsTrigger value="review">Review ({underReview.length})</TabsTrigger>
-          <TabsTrigger value="screening">Screening ({screening.length})</TabsTrigger>
-          <TabsTrigger value="qualified">Qualified ({qualified.length})</TabsTrigger>
-          <TabsTrigger value="promoted">Promoted ({promoted.length})</TabsTrigger>
-        </TabsList>
+      {/* --- FILTER & SEARCH --- */}
+      <Card className="p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-stretch sm:items-center">
+          <div className="relative flex-grow max-w-sm">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, matric, or position..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10"
+            />
+          </div>
+          
+          <Select
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+          >
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <Filter className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Filter by Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Pending Payment</SelectItem>
+              <SelectItem value="payment_verified">Payment Verified</SelectItem>
+              <SelectItem value="screening_scheduled">Screening Scheduled</SelectItem>
+              <SelectItem value="qualified">Qualified</SelectItem>
+              <SelectItem value="disqualified">Disqualified</SelectItem>
+              <SelectItem value="rejected">Rejected/Disqualified</SelectItem>
+              <SelectItem value="promoted">Promoted to Candidate</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Card>
 
-        {[
-          { value: "all", data: filteredAspirants },
-          { value: "pending", data: pendingPayment },
-          { value: "review", data: underReview },
-          { value: "screening", data: screening },
-          { value: "qualified", data: qualified },
-          { value: "promoted", data: promoted },
-        ].map(({ value, data }) => (
-          <TabsContent key={value} value={value}>
-            <div className="border rounded-lg">
+      {/* --- ASPIRANT LIST --- */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center h-48 text-gray-500">
+              <Loader2 className="w-8 h-8 animate-spin mb-3" />
+              <p>Loading aspirant applications...</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-[70vh]">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-gray-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Matric</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead>CGPA</TableHead>
-                    <TableHead>Payment</TableHead>
+                    <TableHead className="min-w-[150px]">Applicant</TableHead>
+                    <TableHead className="hidden sm:table-cell">Position</TableHead>
+                    <TableHead className="hidden lg:table-cell">Matric / CGPA</TableHead>
+                    <TableHead className="hidden md:table-cell">Applied On</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Applied</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.length === 0 ? (
+                  {filteredAspirants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
-                        No aspirants in this category
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                        No aspirants matching the current filters.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    data.map((aspirant) => (
-                      <TableRow key={aspirant.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{aspirant.full_name}</div>
-                            <div className="text-sm text-muted-foreground">{aspirant.email}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono">{aspirant.matric}</TableCell>
-                        <TableCell>{aspirant.aspirant_positions?.name}</TableCell>
-                        <TableCell>{aspirant.cgpa.toFixed(2)}</TableCell>
-                        <TableCell>
-                          {aspirant.payment_verified ? (
-                            <CheckCircle2 className="w-4 h-4 text-success" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-muted-foreground" />
-                          )}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(aspirant)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(aspirant.created_at).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openAspirantDialog(aspirant)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                            {aspirant.screening_result === "qualified" && !aspirant.promoted_to_candidate && (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                onClick={() => promoteToCandidate(aspirant.id)}
-                                className="bg-success hover:bg-success/90"
-                              >
-                                <UserCheck className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredAspirants.map((aspirant) => {
+                      const statusInfo = getStatusBadge(aspirant.status);
+                      const isPromoted = aspirant.promoted_to_candidate;
+
+                      return (
+                        <TableRow key={aspirant.id} className={isPromoted ? "bg-purple-50/50 hover:bg-purple-100/70" : ""}>
+                          <TableCell>
+                            <div className="font-semibold text-gray-800">{aspirant.full_name}</div>
+                            <div className="sm:hidden text-xs text-muted-foreground"><p><strong>{aspirant.aspirant_positions?.name}</strong></p></div>
+                            
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">
+                            {aspirant.aspirant_positions?.name}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <div className="font-mono text-xs">{aspirant.matric}</div>
+                            <Badge variant="outline" className="mt-1">
+                                CGPA: {aspirant.cgpa?.toFixed(2)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                            {formatDisplayDate(aspirant.created_at, false)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusInfo.variant} className={`text-xs ${statusInfo.className}`}>
+                              {statusInfo.icon}
+                              {statusInfo.text}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Dialog open={isDialogOpen && selectedAspirant?.id === aspirant.id} onOpenChange={setIsDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleOpenDialog(aspirant)}
+                                  aria-label={`View and review ${aspirant.full_name}`}
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </DialogTrigger>
+                              {selectedAspirant && selectedAspirant.id === aspirant.id && (
+                                <AspirantDetailsDialog aspirant={selectedAspirant} />
+                              )}
+                            </Dialog>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
             </div>
-          </TabsContent>
-        ))}
-      </Tabs>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Manage Aspirant: {selectedAspirant?.full_name}</DialogTitle>
-            <DialogDescription>Review application details and update status for this aspirant.</DialogDescription>
-          </DialogHeader>
-
-          {selectedAspirant && (
-            <div className="space-y-6">
-              {/* Personal Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Personal Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Email</Label>
-                      <p>{selectedAspirant.email}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Phone</Label>
-                      <p>{selectedAspirant.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Department</Label>
-                      <p>{selectedAspirant.department}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Level</Label>
-                      <p>{selectedAspirant.level}L</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Date of Birth</Label>
-                      <p>{new Date(selectedAspirant.dob).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Gender</Label>
-                      <p>{selectedAspirant.gender}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">CGPA</Label>
-                      <p>{selectedAspirant.cgpa.toFixed(2)}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Position</Label>
-                      <p>{selectedAspirant.aspirant_positions?.name}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Application Details */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Application Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-sm font-medium">Why Running for Position</Label>
-                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                      {selectedAspirant.why_running}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Leadership History</Label>
-                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                      {selectedAspirant.leadership_history}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Documents */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedAspirant.photo_url && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => window.open(selectedAspirant.photo_url!, '_blank')}
-                        className="gap-2"
-                      >
-                        <Image className="w-4 h-4" />
-                        View Photo
-                      </Button>
-                    )}
-                    {selectedAspirant.payment_proof_url && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => window.open(selectedAspirant.payment_proof_url!, '_blank')}
-                        className="gap-2"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        View Payment Proof
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Admin Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Admin Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Payment Verification */}
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="payment_verified"
-                      checked={actionData.payment_verified}
-                      onCheckedChange={(checked) => setActionData({ ...actionData, payment_verified: checked })}
-                    />
-                    <Label htmlFor="payment_verified">Payment Verified</Label>
-                  </div>
-
-                  {/* Admin Review */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admin_review_status">Review Status</Label>
-                      <Select
-                        value={actionData.admin_review_status}
-                        onValueChange={(v) => setActionData({ ...actionData, admin_review_status: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="screening_result">Screening Result</Label>
-                      <Select
-                        value={actionData.screening_result}
-                        onValueChange={(v) => setActionData({ ...actionData, screening_result: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select result" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="not_screened">Not Screened</SelectItem>
-                          <SelectItem value="qualified">Qualified</SelectItem>
-                          <SelectItem value="disqualified">Disqualified</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="admin_review_notes">Review Notes</Label>
-                    <Textarea
-                      id="admin_review_notes"
-                      value={actionData.admin_review_notes}
-                      onChange={(e) => setActionData({ ...actionData, admin_review_notes: e.target.value })}
-                      placeholder="Add notes about this application..."
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Screening */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="screening_scheduled_at">Screening Date</Label>
-                      <Input
-                        id="screening_scheduled_at"
-                        type="datetime-local"
-                        value={actionData.screening_scheduled_at}
-                        onChange={(e) => setActionData({ ...actionData, screening_scheduled_at: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="screening_notes">Screening Notes</Label>
-                    <Textarea
-                      id="screening_notes"
-                      value={actionData.screening_notes}
-                      onChange={(e) => setActionData({ ...actionData, screening_notes: e.target.value })}
-                      placeholder="Add screening notes..."
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Conditional Acceptance */}
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="conditional_acceptance"
-                        checked={actionData.conditional_acceptance}
-                        onCheckedChange={(checked) => setActionData({ ...actionData, conditional_acceptance: checked })}
-                      />
-                      <Label htmlFor="conditional_acceptance">Conditional Acceptance (Pending Resubmission)</Label>
-                    </div>
-
-                    {actionData.conditional_acceptance && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor="conditional_reason">Conditional Reason</Label>
-                          <Textarea
-                            id="conditional_reason"
-                            value={actionData.conditional_reason}
-                            onChange={(e) => setActionData({ ...actionData, conditional_reason: e.target.value })}
-                            placeholder="Explain what needs to be resubmitted..."
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="resubmission_deadline">Resubmission Deadline</Label>
-                          <Input
-                            id="resubmission_deadline"
-                            type="datetime-local"
-                            value={actionData.resubmission_deadline}
-                            onChange={(e) => setActionData({ ...actionData, resubmission_deadline: e.target.value })}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateAspirant}>
-                  Save Changes
-                </Button>
-              </div>
-            </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
 }

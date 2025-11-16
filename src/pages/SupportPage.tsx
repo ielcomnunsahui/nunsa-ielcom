@@ -6,10 +6,14 @@ import {
   Phone, 
   HelpCircle, 
   Book, 
-  Users, 
+  Users,
+  FileText, 
   AlertCircle 
 } from 'lucide-react';
-import NUNSALogo from "@/assets/Ielcom-logo.png";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/footerr";
+
+import { Contact } from "@/components/Contact";
 
 function SupportPage() {
   const contactMethods = [
@@ -30,6 +34,14 @@ function SupportPage() {
       color: 'bg-green-500'
     },
     {
+      icon: FileText,
+      title: 'Elecoral Rules',
+      description: 'Check the Electoral Guidelines',
+      contact: 'View NUNSA Constitution',
+      href: '/rules',
+      color: 'bg-indigo-500'
+    },
+    {
       icon: MapPin,
       title: 'For Printing',
       description: 'Visit NUNSA Cafe during office hours',
@@ -42,7 +54,7 @@ function SupportPage() {
   const faqs = [
     {
       question: 'How do I register to vote?',
-      answer: 'Click on "Register to Vote" on the homepage during the registration period. Complete the multi-step form with your personal information, verify your email, and set up biometric authentication.'
+      answer: 'Click on "Register to Vote" on the homepage during the registration period. Complete the form with your genuine information, verify your email, and set up biometric authentication.'
     },
     {
       question: 'What if I forgot my login credentials?',
@@ -54,7 +66,7 @@ function SupportPage() {
     },
     {
       question: 'How do I apply to be an aspirant?',
-      answer: 'During the aspirant application period, visit the "Aspirants" section, create an account, and complete the 8-step application process including document uploads and payment.'
+      answer: 'During the aspirant application period, visit the "Aspirants" section, create an account, and complete the application process including document uploads and payment.'
     },
     {
       question: 'When will the results be announced?',
@@ -70,13 +82,13 @@ function SupportPage() {
     {
       icon: Book,
       title: 'Electoral Rules',
-      description: 'Read the complete NUNSA constitution and voting guidelines',
+      description: 'View the Electoral Rules and Constitution',
       href: '/rules'
     },
     {
       icon: Users,
       title: 'Voter Registration',
-      description: 'Register ahead of the 2025 election',
+      description: 'Register to vote in the 2025 election',
       href: '/register'
     },
     {
@@ -90,43 +102,7 @@ function SupportPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-inter">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <a href="/" className="flex items-center space-x-3">
-                <div className="w-10 h-10 flex items-center justify-center">
-                 <img 
-                    src={NUNSALogo}
-                    alt="NUNSA Logo Placeholder" 
-                    className="w-auto h-16 sm:h-20 lg:h-30 object-contain rounded-full" 
-                    />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    NUNSA IELCOM
-                  </h1>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Al-Hikmah University, Ilorin.
-                  </p>
-                </div>
-              </a>
-            </div>
-
-            <nav className="flex items-center space-x-6">
-              <a href="/" className="text-gray-600 dark:text-gray-300 hover:text-[#0f7cff] transition-colors">
-                Home
-              </a>
-              <a href="/results" className="text-gray-600 dark:text-gray-300 hover:text-[#0f7cff] transition-colors">
-                Results
-              </a>
-              <a href="/rules" className="text-gray-600 dark:text-gray-300 hover:text-[#0f7cff] transition-colors">
-                Rules
-              </a>
-            </nav>
-          </div>
-        </div>
-      </header>
+       <Navbar />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -205,6 +181,13 @@ function SupportPage() {
           </div>
         </div>
 
+        
+
+        {/* Emergency Contact */}
+        <div>
+              <Contact />
+            </div>
+
         {/* Help Resources */}
         <div className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center">
@@ -234,75 +217,10 @@ function SupportPage() {
             })}
           </div>
         </div>
-
-        {/* Emergency Contact */}
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-3xl p-8">
-          <div className="flex items-start space-x-4">
-            <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                Contact us for Support
-              </h3>
-              <p className="text-gray-700 dark:text-gray-300 mb-4">
-                For urgent technical issues during voting periods or critical system problems, 
-                contact our emergency support line:
-              </p>
-              <div className="flex items-center space-x-4">
-                <a
-                  href="tel:+2347040640646"
-                  className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl font-semibold transition-colors"
-                >
-                  <Phone className="h-5 w-5" />
-                  <span>+234 704 064 0646</span>
-                </a>
-                <a
-                  href="https://wa.me/2347040640646"
-                  className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-2xl font-semibold transition-colors"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  <span>WhatsApp</span>
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <div className="flex justify-center items-center space-x-3 mb-4">
-              <div className="w-8 h-8 flex items-center justify-center">
-                <img 
-                    src={NUNSALogo}
-                    alt="NUNSA Logo Placeholder" 
-                    className="w-auto h-16 sm:h-20 lg:h-30 object-contain rounded-full" 
-                    />
-              </div>
-              <span className="text-xl font-bold">IELCOM Electoral System</span>
-            </div>
-            
-            <p className="text-gray-400 mb-6">
-              Faculty of Nursing Sciences, Al-Hikmah University, Ilorin
-            </p>
-            
-            <div className="flex justify-center space-x-8">
-              <a href="/" className="text-gray-400 hover:text-white transition-colors">
-                Home
-              </a>
-              <a href="/rules" className="text-gray-400 hover:text-white transition-colors">
-                Rules
-              </a>
-              <a href="/results" className="text-gray-400 hover:text-white transition-colors">
-                Results
-              </a>
-            </div>
-          </div>
-        </div>
-      </footer>
+      < Footer />
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');

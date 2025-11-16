@@ -3,14 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Vote as VoteIcon, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { 
+  Vote as VoteIcon, 
+  Loader2, 
+  CheckCircle2, 
+  AlertCircle, 
+  AlertTriangle, 
+  Shield 
+} from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
-// Define strict types for components to eliminate 'any'
+// Define strict types for components
 interface Candidate {
   id: string;
   full_name: string;
@@ -37,12 +46,12 @@ interface VoterSession {
 }
 
 interface VoterInfo {
-    id: string;
-    email: string;
+  id: string;
+  email: string;
 }
 
 const Vote = () => {
-  // Use specific types
+  // Removed unused 'votes' state
   const [voter, setVoter] = useState<VoterInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -51,15 +60,27 @@ const Vote = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // FIX: Move the logic inside useEffect to resolve the exhaustive-deps warning
+  // Helper to calculate progress and check completion
+  const totalPositions = positions.length;
+  const completedPositionsCount = positions.filter((pos) => 
+    selections[pos.name] && selections[pos.name].length > 0
+  ).length;
+
+  // Helper to get candidate name for the confirmation dialog (FIX)
+  const getCandidateName = (candidateId: string) => {
+    return candidates.find(c => c.id === candidateId)?.full_name || 'No selection';
+  };
+
+  // FIX: Moved logic inside useEffect to resolve the exhaustive-deps warning (already done, but clean)
   useEffect(() => {
     const checkAuthAndLoadData = async () => {
+      // ... (Auth and Data Loading Logic remains the same) ...
       try {
-        // Read lightweight voter session created after OTP/Biometric
         const raw = localStorage.getItem("voterSession");
         if (!raw) {
-          navigate("/UserLogin", { replace: true });
+          navigate("/voters-login", { replace: true });
           return;
         }
 
@@ -71,11 +92,10 @@ const Vote = () => {
         }
 
         if (!session?.voterId || !session?.email) {
-          navigate("/login", { replace: true });
+          navigate("/voters-login", { replace: true });
           return;
         }
 
-        // Check if voter has already voted from database
         const { data: voterData, error: voterError } = await supabase
           .from("voters")
           .select("voted, verified")
@@ -84,7 +104,6 @@ const Vote = () => {
 
         if (voterError) throw voterError;
 
-        // FIX: Implement cleaner redirect for users who have already voted
         if (voterData?.voted) {
           toast({
             title: "Vote Already Cast",
@@ -100,14 +119,12 @@ const Vote = () => {
             description: "Your account is not verified. Please complete verification.",
             variant: "destructive",
           });
-          navigate("/login", { replace: true });
+          navigate("/voters-login", { replace: true });
           return;
         }
 
-        // Set voter data based on the valid session
         setVoter({ id: session.voterId, email: session.email });
 
-        // Load positions and candidates
         const [positionsResult, candidatesResult] = await Promise.all([
           supabase.from("positions").select("*").order("display_order", { ascending: true }),
           supabase.from("candidates").select("*").order("position", { ascending: true }),
@@ -119,7 +136,6 @@ const Vote = () => {
         setPositions(positionsResult.data || []);
         setCandidates(candidatesResult.data || []);
 
-        // Initialize selections
         const initialSelections: VoteSelection = {};
         positionsResult.data?.forEach((pos) => {
           initialSelections[pos.name] = [];
@@ -128,21 +144,19 @@ const Vote = () => {
 
       } catch (error) {
         console.error("Error loading data:", error);
-        // Safely determine error message
         const message = error instanceof Error ? error.message : "Failed to load voting data. Please try again.";
         toast({
           title: "Error",
           description: message,
           variant: "destructive",
         });
-        navigate("/login", { replace: true }); // Fallback redirect
+        navigate("/voters-login", { replace: true });
       } finally {
         setIsLoading(false);
       }
     };
     
     checkAuthAndLoadData();
-    // Dependencies are correct: navigate and toast are stable or imported globally
   }, [navigate, toast]); 
 
   const handleSingleSelection = (positionName: string, candidateId: string) => {
@@ -178,18 +192,24 @@ const Vote = () => {
   };
 
   const handleSubmitVote = async () => {
-    // Ensure voter is not null before proceeding
     if (!voter) return; 
 
-    // Validate all positions have selections
-    const allPositionsFilled = positions.every((pos) => 
-      selections[pos.name] && selections[pos.name].length > 0
-    );
-
-    if (!allPositionsFilled) {
+    // Validate all positions have selections (optional, but good practice for a full ballot)
+    if (completedPositionsCount < totalPositions) {
       toast({
-        title: "Incomplete Ballot",
-        description: "Please make a selection for all positions before submitting.",
+        title: "Partial Ballot",
+        description: `You have not voted for all positions. You can still submit, but please review.`,
+        variant: "warning",
+      });
+      // Optionally stop submission here if voting is mandatory for all positions
+      // For now, allow partial submission but give a final warning
+    }
+    
+    // Perform final check before submission
+    if (completedPositionsCount === 0) {
+      toast({
+        title: "No Votes Selected",
+        description: "Please make at least one selection before submitting.",
         variant: "destructive",
       });
       return;
@@ -203,7 +223,6 @@ const Vote = () => {
         body: { voterId: voter.id, selections },
       });
 
-      // The Edge Function (submit-vote) is responsible for marking 'voted = true'
       if (error) throw error;
 
       toast({
@@ -214,12 +233,10 @@ const Vote = () => {
       // CRITICAL: Clear voter session to prevent re-access (Zero-Trust principle)
       localStorage.removeItem("voterSession");
       
-      // Redirect to results page
       setTimeout(() => navigate("/results", { replace: true }), 2000);
 
     } catch (error) {
       console.error("Vote submission error:", error);
-      // Safely handle error message
       const message = error instanceof Error ? error.message : "Failed to submit vote. Please try again.";
       toast({
         title: "Submission Failed",
@@ -228,6 +245,7 @@ const Vote = () => {
       });
     } finally {
       setIsSubmitting(false);
+      setShowConfirmation(false); // Close dialog on success/failure
     }
   };
 
@@ -245,65 +263,82 @@ const Vote = () => {
     );
   }
 
-  // NOTE: The 'hasVoted' logic is no longer needed here because we redirect 
-  // immediately in useEffect if the user is already marked as voted.
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      <main className="pt-24 px-4 pb-12">
-        <div className="container mx-auto max-w-4xl">
-          <div className="text-center mb-8 animate-fade-in">
-            <div className="inline-flex items-center justify-center p-4 bg-gradient-success rounded-full shadow-success-glow mb-4">
-              <VoteIcon className="w-8 h-8 text-success-foreground" />
-            </div>
-            <h1 className="text-4xl font-bold mb-2 text-foreground">
-              Cast Your Vote
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Make your selection for each position
-            </p>
-            {voter?.email && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Voting as: {voter.email}
+      {/* Dialogue wraps everything so its trigger can be in main content or fixed footer */}
+      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+        
+        {/* Added mobile-only bottom padding to ensure content is visible above the fixed footer */}
+        <main className="pt-24 px-4 pb-28 sm:pb-12"> 
+          <div className="container mx-auto max-w-4xl">
+            {/* Header */}
+            <div className="text-center mb-8 animate-fade-in">
+              <div className="inline-flex items-center justify-center p-4 bg-gradient-success rounded-full shadow-success-glow mb-4">
+                <VoteIcon className="w-8 h-8 text-success-foreground" />
+              </div>
+              <h1 className="text-4xl font-bold mb-2 text-foreground">
+                Cast Your Vote
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                Make your selection for each position
               </p>
-            )}
-          </div>
+              {voter?.email && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  Voting as: **{voter.email}**
+                </p>
+              )}
+            </div>
 
-          <div className="space-y-8">
-            {positions.map((position, index) => {
-              const positionCandidates = candidates.filter((c) => c.position === position.name);
+            {/* Positions */}
+            <div className="space-y-8">
+              {positions.map((position, index) => {
+                const positionCandidates = candidates.filter((c) => c.position === position.name);
+                const isSelected = completedPositionsCount > index;
 
-              return (
-                <Card key={position.id} className="p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-foreground">{position.name}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {position.vote_type === "single" 
-                        ? "Select one candidate" 
-                        : `Select up to ${position.max_selections} candidate(s)`}
-                    </p>
-                  </div>
+                return (
+                  <Card key={position.id} className="p-4 sm:p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
+                    <div className="mb-6 border-b pb-4">
+                      <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center">
+                        {position.name}
+                        {isSelected && <CheckCircle2 className="w-5 h-5 ml-3 text-success" />}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {position.vote_type === "single" 
+                          ? "Select one candidate" 
+                          : `Select up to ${position.max_selections} candidate(s)`}
+                      </p>
+                    </div>
 
-                  {position.vote_type === "single" ? (
-                    <RadioGroup
-                      value={selections[position.name]?.[0] || ""}
-                      onValueChange={(value) => handleSingleSelection(position.name, value)}
-                    >
-                      <div className="space-y-4">
-                        {positionCandidates.map((candidate) => (
+                    {/* Candidate Selection List */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {positionCandidates.map((candidate) => {
+                        const isCandidateSelected = selections[position.name]?.includes(candidate.id);
+                        return (
                           <div
                             key={candidate.id}
-                            className={`flex items-center space-x-4 p-4 rounded-lg border ${
-                              selections[position.name]?.includes(candidate.id)
-                                ? "border-primary bg-primary/5"
+                            className={`flex items-center space-x-4 p-3 sm:p-4 rounded-lg border ${
+                              isCandidateSelected
+                                ? "border-primary bg-primary/5 shadow-md"
                                 : "border-border hover:border-primary/50"
                             } transition-all cursor-pointer`}
-                            onClick={() => handleSingleSelection(position.name, candidate.id)}
+                            onClick={() => position.vote_type === "single" 
+                              ? handleSingleSelection(position.name, candidate.id) 
+                              : handleMultipleSelection(position.name, candidate.id, position)
+                            }
                           >
-                            <RadioGroupItem value={candidate.id} id={candidate.id} />
-                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
+                            {position.vote_type === "single" ? (
+                              <RadioGroupItem value={candidate.id} id={candidate.id} checked={isCandidateSelected} className="flex-shrink-0" />
+                            ) : (
+                              <Checkbox
+                                id={candidate.id}
+                                checked={isCandidateSelected}
+                                className="flex-shrink-0"
+                              />
+                            )}
+                            
+                            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
                               {candidate.picture_url ? (
                                 <img
                                   src={candidate.picture_url}
@@ -311,94 +346,151 @@ const Vote = () => {
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <span className="text-2xl font-bold text-muted-foreground">
+                                <span className="text-xl sm:text-2xl font-bold text-muted-foreground">
                                   {candidate.full_name.charAt(0)}
                                 </span>
                               )}
                             </div>
-                            <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-lg font-semibold">
+                            <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-base sm:text-lg font-semibold min-w-0">
                               {candidate.full_name}
                             </Label>
                           </div>
-                        ))}
-                      </div>
-                    </RadioGroup>
-                  ) : (
-                    <div className="space-y-4">
-                      {positionCandidates.map((candidate) => (
-                        <div
-                          key={candidate.id}
-                          className={`flex items-center space-x-4 p-4 rounded-lg border ${
-                            selections[position.name]?.includes(candidate.id)
-                              ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/50"
-                          } transition-all cursor-pointer`}
-                          onClick={() => handleMultipleSelection(position.name, candidate.id, position)}
-                        >
-                          <Checkbox
-                            id={candidate.id}
-                            checked={selections[position.name]?.includes(candidate.id)}
-                            onCheckedChange={() => handleMultipleSelection(position.name, candidate.id, position)}
-                          />
-                          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
-                            {candidate.picture_url ? (
-                              <img
-                                src={candidate.picture_url}
-                                alt={candidate.full_name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="text-2xl font-bold text-muted-foreground">
-                                {candidate.full_name.charAt(0)}
-                              </span>
-                            )}
-                          </div>
-                          <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-lg font-semibold">
-                            {candidate.full_name}
-                          </Label>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
-
-          <Card className="p-6 mt-8 bg-muted/30">
-            <div className="flex items-start gap-3 mb-6">
-              <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold mb-2 text-foreground">Before You Submit:</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Review all your selections carefully</li>
-                  <li>• Once submitted, you cannot change your vote</li>
-                  <li>• Your vote is completely anonymous</li>
-                  <li>• Results will be available immediately after voting closes</li>
-                </ul>
-              </div>
+                  </Card>
+                );
+              })}
             </div>
 
-            <Button
-              onClick={handleSubmitVote}
-              disabled={isSubmitting}
-              className="w-full bg-gradient-success hover:shadow-success-glow text-lg py-6"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Submitting Vote...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
-                  Submit My Vote
-                </>
-              )}
-            </Button>
-          </Card>
+            {/* Desktop/Tablet Submission Area (Hidden on Mobile) */}
+            <Card className="p-6 mt-8 bg-muted/30 hidden sm:block">
+              <div className="flex items-start gap-3 mb-6">
+                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold mb-2 text-foreground">Before You Submit:</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Review all your selections carefully</li>
+                    <li>• Once submitted, you cannot change your vote</li>
+                    <li>• Your vote is completely anonymous</li>
+                    <li>• Results will be available immediately after voting closes</li>
+                  </ul>
+                </div>
+              </div>
+              
+              {/* Desktop/Tablet Submit Button (Dialog Trigger) */}
+              <div className="mt-6 text-center">
+                <DialogTrigger asChild>
+                  <Button
+                    variant="vote"
+                    size="lg"
+                    disabled={isSubmitting || completedPositionsCount === 0}
+                    className="px-12 w-full max-w-sm"
+                  >
+                    <VoteIcon className="w-5 h-5 mr-2" />
+                    Submit My Votes ({completedPositionsCount}/{totalPositions})
+                  </Button>
+                </DialogTrigger>
+
+                {completedPositionsCount < totalPositions && (
+                  <p className="text-sm text-muted-foreground mt-4">
+                    <AlertTriangle className="w-4 h-4 inline mr-1 text-warning"/> You have **{totalPositions - completedPositionsCount}** position(s) unselected. We recommend voting for all.
+                  </p>
+                )}
+              </div>
+            </Card>
+          </div>
+        </main>
+
+        {/* MOBILE FIXED FOOTER for Submission (Hidden on sm+) */}
+        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 border-t bg-card shadow-[0_-4px_6px_-1px_rgb(0_0_0_/_0.1)] sm:hidden">
+            {completedPositionsCount < totalPositions && (
+                <Alert className="mb-2 p-2 border-warning text-xs">
+                    <AlertTriangle className="w-4 h-4 text-warning mr-2"/>
+                    <AlertDescription className="text-muted-foreground">
+                        **{totalPositions - completedPositionsCount}** position(s) remaining.
+                    </AlertDescription>
+                </Alert>
+            )}
+            <DialogTrigger asChild>
+                <Button
+                    variant="vote"
+                    size="lg"
+                    disabled={isSubmitting || completedPositionsCount === 0}
+                    className="w-full"
+                >
+                    {isSubmitting ? (
+                        <>
+                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                            Submitting...
+                        </>
+                    ) : (
+                        <>
+                            <VoteIcon className="w-5 h-5 mr-2" />
+                            Submit My Votes ({completedPositionsCount}/{totalPositions})
+                        </>
+                    )}
+                </Button>
+            </DialogTrigger>
         </div>
-      </main>
+        
+        {/* Confirmation Dialog Content (Shared by both triggers) */}
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <AlertTriangle className="w-5 h-5 text-warning" />
+              <span>Confirm Your Votes</span>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Alert className='border-warning text-warning-foreground'>
+              <Shield className="h-4 w-4" />
+              <AlertDescription>
+                Final Warning: Once submitted, your votes cannot be changed. Please review your selections carefully.
+              </AlertDescription>
+            </Alert>
+
+            {/* FIX: Correctly mapping over selections/positions */}
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2"> 
+              {positions.map((position) => {
+                const selectedIds = selections[position.name] || [];
+                const selectedNames = selectedIds.map(getCandidateName);
+                
+                return (
+                  <div 
+                    key={position.id} 
+                    className="flex flex-col sm:flex-row justify-between items-start py-2 border-b border-border last:border-b-0"
+                  >
+                    <span className="font-medium text-sm w-full sm:w-1/3 mb-1 sm:mb-0">{position.name}:</span>
+                    <span className="text-sm text-foreground/80 font-mono sm:text-right w-full sm:w-2/3">
+                      {selectedNames.length > 0 ? selectedNames.join(', ') : <span className="text-destructive font-semibold">No selection</span>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex space-x-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmation(false)}
+                className="flex-1"
+              >
+                Review Again
+              </Button>
+              <Button
+                variant="vote"
+                onClick={handleSubmitVote}
+                disabled={isSubmitting || completedPositionsCount === 0}
+                className="flex-1"
+              >
+                {isSubmitting ? 'Submitting...' : `Confirm & Submit (${completedPositionsCount}/${totalPositions})`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
