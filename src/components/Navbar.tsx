@@ -1,170 +1,181 @@
 import { Button } from "@/components/ui/button";
-import { Shield, User, Trophy, Menu, X } from "lucide-react";
+import { Shield, Trophy, Menu, X, Vote, Home, UserPlus, Scale, HelpCircle, LayoutDashboard, LogIn } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { useState } from "react";
-// ADDED LOGO IMPORT
+import { useState, useMemo } from "react";
 import NUNSALogo from "@/assets/Ielcom-logo.png"; 
 
 const Navbar = () => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // Check if the current path is any of the login/admin/aspirant dashboard or application pages
-  const isProtectedPath = 
-    location.pathname === "/voters-login" || 
-    location.pathname === "/admin-login" || 
-    location.pathname === "/aspirant-login" ||
-    location.pathname.startsWith("/aspirant"); 
-    
-  // Check if the current path is the Aspirant Dashboard page
-  const isAspirantDashboardPage = location.pathname === "/aspirant";
 
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
+  const navigation = useMemo(() => [
+    { name: 'Home', href: '/', icon: Home },
+    { name: 'Register', href: '/register', icon: UserPlus },
+    { name: 'Vote', href: '/vote', icon: Vote },
+    { name: 'Constitution', href: '/rules', icon: Scale },
+    { name: 'Support', href: '/support', icon: HelpCircle },
+  ], []);
+
+  // --- Path Analysis ---
+  const path = location.pathname;
+  const isAspirantRoute = path.startsWith("/aspirant");
+  const isAdminRoute = path.startsWith("/admin");
+  const isVotersRoute = path.startsWith("/voters-login");
+  
+  // Pages where main links should be hidden (Dashboard/App pages)
+  const isDashboardPage = 
+    (isAspirantRoute && path !== "/aspirant-login") || 
+    (isAdminRoute && path !== "/admin-login");
+  
+  // Pages where we should offer a 'Home' button instead of login options
+  const isInternalPage = isDashboardPage || isVotersRoute;
+
+  const isActive = (href: string) => path === href;
+  const toggleMobileMenu = () => setIsMobileMenuOpen(prev => !prev);
+  
+  // --- Dynamic Action Button Logic ---
+  const renderActionButtons = (isMobile: boolean) => {
+    // If on an internal page, show 'Go to Home'
+    if (isInternalPage) {
+      return (
+        <Link to="/" onClick={() => isMobile && toggleMobileMenu()} className="w-full">
+          <Button variant="outline" size={isMobile ? "default" : "sm"} className="gap-2 w-full sm:w-auto hover:bg-gray-100 transition-colors">
+            <Home className="w-4 h-4" />
+            Go to Home
+          </Button>
+        </Link>
+      );
+    }
+
+    // Otherwise, show the main login options (Primary action first)
+    return (
+      <>
+        {/* Aspirant Login/Apply */}
+        <Link to="/aspirant-login" onClick={() => isMobile && toggleMobileMenu()} className={isMobile ? "w-full" : ""}>
+          <Button 
+            variant="default" 
+            size={isMobile ? "default" : "sm"} 
+            className="gap-2 w-full justify-center bg-blue-600 hover:bg-blue-700 transition-colors"
+          >
+            <Trophy className="w-4 h-4" />
+            Aspirant Login
+          </Button>
+        </Link>
+
+        {/* Admin Login */}
+        <Link to="/admin-login" onClick={() => isMobile && toggleMobileMenu()} className={isMobile ? "w-full" : ""}>
+          <Button 
+            variant="ghost" 
+            size={isMobile ? "default" : "sm"} 
+            className="gap-2 w-full justify-center sm:w-auto hover:bg-gray-100 transition-colors"
+          >
+            <Shield className="w-4 h-4" />
+            Admin
+          </Button>
+        </Link>
+      </>
+    );
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-md border-b border-border">
-      <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          {/* REPLACED SHIELD ICON WITH LOGO */}
-          <div className="p-1 bg-white rounded-lg shadow-glow flex items-center justify-center">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm transition-all duration-300">
+      <div className="container mx-auto px-4 sm:px-6 py-3 flex items-center justify-between h-16">
+        
+        {/* Logo and Title */}
+        <Link to="/" className="flex items-center gap-3 group">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
             <img 
-              src={NUNSALogo} 
-              alt="Ielcom Logo" 
-              className="w-6 h-6 sm:w-8 sm:h-8 object-contain" 
+              src={NUNSALogo}
+              alt="NUNSA IELCOM Logo" 
+              className="w-full h-full object-contain rounded-full shadow-inner" 
             />
           </div>
-          <div className="hidden sm:block">
-            <h1 className="font-bold text-base sm:text-lg text-foreground group-hover:text-primary transition-colors">
+          <div>
+            <h1 className="font-bold text-lg sm:text-xl text-gray-800 group-hover:text-blue-600 transition-colors leading-tight">
               NUNSA IELCOM
             </h1>
-            <p className="text-xs text-muted-foreground hidden lg:block">Al-Hikmah University Chapter</p>
-          </div>
-          <div className="sm:hidden">
-            <h1 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
-              IELCOM
-            </h1>
+            <p className="text-[10px] text-gray-500  sm:block leading-none">Al-Hikmah University Chapter</p>
           </div>
         </Link>
         
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center gap-2 lg:gap-3">
-          {/* Show login/apply buttons only when not on a protected or internal page */}
-          {!isProtectedPath && (
-            <>
-              {/* Apply for Position Button */}
-              <Link to="/aspirant-login">
-                <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
-                  <Trophy className="w-3 h-3 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Aspirant Login</span>
-                  <span className="lg:hidden">Aspirant</span>
-                </Button>
-              </Link>
-              
-              {/* Voter Login Button */}
-              <Link to="/voters-login">
-                <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
-                  <User className="w-3 h-3 lg:w-4 lg:h-4" />
-                  <span className="hidden lg:inline">Voter Login</span>
-                  <span className="lg:hidden">Vote</span>
-                </Button>
-              </Link>
-              
-              {/* Admin Login Button */}
-              <Link to="/admin-login">
-                <Button variant="ghost" size="sm" className="gap-2 text-xs lg:text-sm">
-                  <Shield className="w-3 h-3 lg:w-4 lg:h-4" />
-                  Admin
-                </Button>
-              </Link>
-            </>
-          )}
+        {/* Desktop Navigation & Actions (Hidden on mobile) */}
+        <div className="hidden lg:flex items-center gap-4">
+          
+          {/* Main Links */}
+          <div className="flex gap-1">
+            {!isDashboardPage && navigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                    isActive(item.href)
+                      ? 'bg-blue-500 text-white shadow-md'
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden xl:inline">{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
 
-          {/* Show a helpful button if the user is on the Aspirant page */}
-          {isAspirantDashboardPage && (
-            <Link to="/">
-              <Button variant="outline" size="sm" className="gap-2 text-xs lg:text-sm">
-                <Shield className="w-3 h-3 lg:w-4 lg:h-4" />
-                Home
-              </Button>
-            </Link>
-          )}
-
-          {/* Always show the View Results button */}
-          <Link to="/Rules">
-            <Button variant="default" size="sm" className="text-xs lg:text-sm">
-              <span className="hidden lg:inline">View Electoral Rules</span>
-              <span className="lg:hidden">Electoral Rules</span>
-            </Button>
-          </Link>
+          {/* Action Buttons */}
+          <div className="flex gap-2 ml-4">
+            {renderActionButtons(false)}
+          </div>
         </div>
 
-        {/* Mobile Menu Button */}
-        <div className="md:hidden">
+        {/* Mobile Menu Button (Visible on mobile, hidden on desktop) */}
+        <div className="lg:hidden">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={toggleMobileMenu}
-            className="p-2"
+            className="p-2 transition-transform duration-200"
           >
-            {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {isMobileMenuOpen ? <X className="w-6 h-6 text-gray-800" /> : <Menu className="w-6 h-6 text-gray-800" />}
           </Button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden bg-card/95 backdrop-blur-md border-b border-border">
-          <div className="container mx-auto px-4 py-4 space-y-3">
-            {/* Show login/apply buttons only when not on a protected or internal page */}
-            {!isProtectedPath && (
-              <>
-                {/* Aspirant Login Button */}
-                <Link to="/aspirant-login" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
-                    <Trophy className="w-4 h-4" />
-                    Aspirant Login
-                  </Button>
-                </Link>
-                
-                {/* Voter Login Button */}
-                <Link to="/voters-login" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
-                    <User className="w-4 h-4" />
-                    Voter Login
-                  </Button>
-                </Link>
-                
-                {/* Admin Login Button */}
-                <Link to="/admin-login" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="ghost" size="sm" className="w-full gap-2 justify-start">
-                    <Shield className="w-4 h-4" />
-                    Admin Login
-                  </Button>
-                </Link>
-              </>
-            )}
-
-            {/* Show a helpful button if the user is on the Aspirant page */}
-            {isAspirantDashboardPage && (
-              <Link to="/" onClick={() => setIsMobileMenuOpen(false)}>
-                <Button variant="outline" size="sm" className="w-full gap-2 justify-start">
-                  <Shield className="w-4 h-4" />
-                  Home
-                </Button>
+      {/* --- Mobile Dropdown Menu --- */}
+      <div 
+        className={`lg:hidden absolute top-full left-0 right-0 bg-white shadow-xl border-t border-gray-100 transition-all duration-300 overflow-hidden ${
+          isMobileMenuOpen ? 'max-h-screen opacity-100 py-4' : 'max-h-0 opacity-0 py-0'
+        }`}
+      >
+        <div className="container mx-auto px-4 sm:px-6 space-y-2">
+          
+          {/* Navigation Links */}
+          {!isDashboardPage && navigation.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.name}
+                to={item.href}
+                onClick={toggleMobileMenu}
+                className={`flex items-center gap-3 px-4 py-3 rounded-md font-semibold transition-colors w-full justify-start text-base ${
+                  isActive(item.href)
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span>{item.name}</span>
               </Link>
-            )}
-
-            {/* Always show the View Results button */}
-            <Link to="/Rules" onClick={() => setIsMobileMenuOpen(false)}>
-              <Button variant="default" size="sm" className="w-full justify-start">
-                Electoral Rules
-              </Button>
-            </Link>
+            );
+          })}
+          
+          {/* Action Buttons */}
+          <div className="pt-4 border-t border-gray-100 mt-4 space-y-3 flex flex-col items-center">
+            {renderActionButtons(true)}
           </div>
+
         </div>
-      )}
+      </div>
     </nav>
   );
 };

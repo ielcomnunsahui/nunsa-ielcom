@@ -9,7 +9,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import AdminLogin from "./pages/AdminLogin";
 import AspirantLogin from "./pages/AspirantLogin";
-import Vote from "./pages/Vote";
+import Vote from "./pages/SecureVote";
 import VotersLogin from "./pages/VotersLogin";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
@@ -18,6 +18,7 @@ import SupportPage from "./pages/SupportPage";
 import Rules from "./pages/Rules";
 import AspirantDashboard from "./pages/AspirantDashboard";
 import AspirantApplication from "./pages/AspirantApplication";
+import PublicCandidatesView from "./pages/PublicCandidatesView";
 
 const queryClient = new QueryClient();
 
@@ -38,11 +39,12 @@ const App = () => (
           <Route path="/voters-login" element={<VotersLogin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
-          <Route path="/Rules" element={<Rules />} />
-          <Route path="/Support" element={<SupportPage />} />
+          <Route path="/rules" element={<Rules />} />
+          <Route path="/support" element={<SupportPage />} />
           {/* ASPIRANT ROUTES */}
           <Route path="/aspirant" element={<AspirantDashboard />} />
           <Route path="/aspirant/apply" element={<AspirantApplication />} />
+          <Route path="/candidates" element={<PublicCandidatesView />}/>
           {/* CATCH-ALL ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

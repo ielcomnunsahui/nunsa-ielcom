@@ -4,8 +4,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Search, FileText } from "lucide-react";
+import { Loader2, Search, FileText, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "../ui/button";
 
 interface AuditLog {
   id: string;
@@ -95,17 +96,29 @@ export function AdminAuditLog() {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center gap-4">
+      <div className="space-y-4">
         <h2 className="text-2xl font-bold">Audit Logs</h2>
-        <div className="flex gap-2 flex-1 max-w-2xl">
-          <div className="relative flex-1">
+        
+        {/* Search and Filter Row */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-grow sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search logs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 pr-8"
             />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                onClick={() => setSearchTerm("")}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
           </div>
           <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
             <SelectTrigger className="w-48">

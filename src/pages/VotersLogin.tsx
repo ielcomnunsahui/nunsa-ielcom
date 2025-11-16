@@ -17,7 +17,7 @@ const matricSchema = z.object({
     .regex(/^\d{2}\/\d{2}[a-z]{3}\d{3}$/, "Invalid matric format (e.g., 21/08nus014)"),
 });
 
-const Login = () => {
+const VotersLogin = () => {
   const [matric, setMatric] = useState("");
   const [step, setStep] = useState<"matric" | "auth" | "otp">("matric");
   const [voterId, setVoterId] = useState("");
@@ -421,4 +421,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default VotersLogin;

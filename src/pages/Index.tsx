@@ -1,19 +1,24 @@
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/footerr";
 import Hero from "@/components/Hero";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, Shield, Eye, Lock } from "lucide-react";
+import { UserPlus, CheckCircle2, Shield, Trophy, Eye, Lock } from "lucide-react";
 import ElectionTimeline from "@/components/ElectionTimeline";
-import { Contact } from "@/components/Contact";
+
 
 const Index = () => {
   
   return (
     <div className="min-h-screen bg-background">
+      
       <Navbar />
       
       <main className="pt-20">
         <Hero />
         
+        {/* NEW Electoral Timeline Section */}
+         
+                  <ElectionTimeline />
 
         
         {/* How it Works - Add an ID for the linkToId to scroll to */}
@@ -69,26 +74,91 @@ const Index = () => {
             </div>
           </div>
         </section>
-        {/* NEW Electoral Timeline Section */}
-         <section className="py-8 px-4 w-full">
-           <div className="max-w-6xl mx-auto">
-              <h2 className="text-3xl font-bold text-center mb-8 text-primary">
-                  Electoral Timeline
-              </h2>
-                  <ElectionTimeline />
-              </div>
-          </section>
-          <Contact />
+            
+
+          
+                    {/* Quick Navigation (Hidden in print) */}
+                    <div className="max-w-5xl mx-auto mt-16 print:hidden">
+                      <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-6 text-center">
+                          Quick Navigation
+                        </h3>
+                        <div className="grid md:grid-cols-4 gap-6">
+                          <a
+                            href="/register"
+                            className="flex items-center space-x-3 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+                              <UserPlus className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                Register
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Register to Vote
+                              </p>
+                            </div>
+                          </a>
+
+                          <a
+                            href="/aspirant-login"
+                            className="flex items-center space-x-3 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center">
+                              <Trophy className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                Apply
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Apply for a position
+                              </p>
+                            </div>
+                          </a>
+          
+                          <a
+                            href="/results"
+                            className="flex items-center space-x-3 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center">
+                              <Eye className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                Live Results
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                View realtime results
+                              </p>
+                            </div>
+                          </a>
+          
+                          <a
+                            href="/support"
+                            className="flex items-center space-x-3 p-4 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <div className="w-10 h-10 bg-red-500 rounded-xl flex items-center justify-center">
+                              <span className="text-white font-bold">?</span>
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-900 dark:text-white">
+                                Support
+                              </p>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Get help and support
+                              </p>
+                            </div>
+                          </a>
+                        </div>
+                      </div>
+                      </div>
        
       </main>
       
-      <footer className="py-8 px-4 border-t border-border">
-        <div className="container mx-auto text-center text-sm text-muted-foreground">
-          <p>© 2025 NUNSA Electoral System. All rights reserved.</p>
-          <p className="mt-2">Powered by ISECO 2025/2026 Academic Session • Built with security and transparency</p>
-        </div>
-      </footer>
-    </div>
+      < Footer />
+      </div>
   );
 };
 

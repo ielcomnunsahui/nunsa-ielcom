@@ -279,6 +279,7 @@ export type Database = {
           picture_url: string | null
           position: string
           vote_count: number | null
+          manifesto: string | null
         }
         Insert: {
           created_at?: string | null
@@ -287,6 +288,7 @@ export type Database = {
           picture_url?: string | null
           position: string
           vote_count?: number | null
+          manifesto: string | null
         }
         Update: {
           created_at?: string | null
@@ -295,6 +297,7 @@ export type Database = {
           picture_url?: string | null
           position?: string
           vote_count?: number | null
+          manifesto: string | null
         }
         Relationships: []
       }
@@ -420,18 +423,21 @@ export type Database = {
           id: string
           matric: string
           name: string
+          level: string
         }
         Insert: {
           created_at?: string | null
           id?: string
           matric: string
           name: string
+          level: string
         }
         Update: {
           created_at?: string | null
           id?: string
           matric?: string
           name?: string
+          level?: string
         }
         Relationships: []
       }
