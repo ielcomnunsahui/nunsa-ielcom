@@ -1480,9 +1480,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
                     className="cursor-pointer"
                   />
                   {validationErrors.payment_proof && <p className="text-sm text-destructive">{validationErrors.payment_proof}</p>}
-                  <p className="text-xs text-muted-foreground">
-                    Contact Treasurer on whatsapp: +234 912 919 6214 before making payment and Upload screenshot or receipt of payment (Image/PDF, max 2MB)
-                  </p>
+                 
                 </div>
 
                 <Card className="p-4 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700">
@@ -1491,6 +1489,8 @@ const generateRefereeFormContent = (applicantName: string): string => {
                     <div className="text-sm">
                       <p className="font-medium text-amber-900 dark:text-amber-300 mb-1">Payment Guidelines:</p>
                       <ul className="text-amber-800 dark:text-amber-400 space-y-1">
+                        <li>• Contact Treasurer on whatsapp: +234 912 919 6214 before making payment</li>
+                        <li>• Upload screenshot or receipt of payment (Image/PDF, max 2MB)</li>
                         <li>• Ensure the payment amount matches the application fee exactly</li>
                         <li>• Include your name and matric number in the payment reference if possible</li>
                       </ul>

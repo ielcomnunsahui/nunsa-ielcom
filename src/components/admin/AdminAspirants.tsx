@@ -42,7 +42,6 @@ const generateWhatsappLink = (phone: string, message: string): string => {
 
 // HELPER FUNCTION: Get status badge variant and custom Tailwind class for color.
 const getStatusBadge = (status: string) => {
-    // ... (rest of the getStatusBadge logic remains the same)
     switch (status) {
         // Pending: Uses default variant with a custom yellow color class
         case "pending": return { text: "Pending Payment", variant: "default" as const, icon: <Clock className="w-3 h-3 mr-1" />, className: "bg-yellow-500/10 text-yellow-600 border-yellow-300" };
@@ -76,7 +75,7 @@ interface Aspirant {
   date_of_birth: string; // Stored as a date string, e.g., '1990-11-14'
   gender: string;
   cgpa: number;
-  position_id: string;
+  position_id: string; // Crucial for the promotion fix
   why_running: string;
   leadership_history: string;
   photo_url: string | null;
@@ -123,6 +122,9 @@ export function AdminAspirants() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  // FIX: Move Tab state to the parent component to persist across re-renders
+  const [activeDialogTab, setActiveDialogTab] = useState("info"); 
+
   const [actionData, setActionData] = useState({
     payment_verified: false,
     admin_review_status: "",
@@ -226,6 +228,8 @@ export function AdminAspirants() {
       conditional_reason: aspirant.conditional_reason || "",
       resubmission_deadline: aspirant.resubmission_deadline ? new Date(aspirant.resubmission_deadline).toISOString().slice(0, 16) : "",
     });
+    // FIX: Set the tab back to info when opening a new aspirant's dialog
+    setActiveDialogTab("info"); 
     setIsDialogOpen(true);
   };
 
@@ -277,7 +281,8 @@ export function AdminAspirants() {
         description: `${selectedAspirant.full_name}'s application updated.`,
       });
       fetchAspirants();
-      setIsDialogOpen(false);
+      // Dialog Fix: The dialog state is intentionally NOT set to false here,
+      // allowing the user to make multiple changes before closing manually.
 
     } catch (error) {
       console.error("Update error:", error);
@@ -310,16 +315,19 @@ export function AdminAspirants() {
         .from("candidates")
         .insert({
           full_name: aspirant.full_name,
-          matric: aspirant.matric,
-          position: aspirant.aspirant_positions?.name || "Unknown Position",
+          // FIX: The 'matric' column is NOT in your 'public.candidates' table. 
+          // Removed from the insertion payload to prevent the "Promotion Failed" error.
+          position: aspirant.aspirant_positions?.name || "Unknown Position", // Needs position NAME (text)
           picture_url: aspirant.photo_url,
           manifesto: aspirant.why_running || null, 
-          // You might need to set the voting_position_id here if your schema requires it
         })
         .select()
         .single();
 
-      if (candidateError) throw candidateError;
+      if (candidateError) {
+        console.error("Candidate creation error:", candidateError);
+        throw new Error(candidateError.message || "Failed to insert candidate record.");
+      }
 
       // 2. Update the aspirant record
       const { error: updateError } = await supabase
@@ -332,7 +340,11 @@ export function AdminAspirants() {
         })
         .eq("id", aspirant.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Aspirant update error after promotion:", updateError);
+        // It's crucial to still show success if candidate was created, 
+        // but log the secondary error.
+      }
 
       toast({
         title: "Promotion Successful",
@@ -340,13 +352,14 @@ export function AdminAspirants() {
         variant: "default", 
       });
       fetchAspirants();
-      setIsDialogOpen(false);
+      // Close the dialog after the successful promotion action
+      setIsDialogOpen(false); 
 
     } catch (error) {
       console.error("Promotion error:", error);
       toast({
         title: "Promotion Failed",
-        description: "Failed to promote aspirant to candidate. Check console for details.",
+        description: `Failed to promote aspirant to candidate. Error: ${error instanceof Error ? error.message : "An unknown error occurred."}`,
         variant: "destructive",
       });
     } finally {
@@ -390,7 +403,9 @@ export function AdminAspirants() {
     </div>
   );
 
-  const AspirantDetailsDialog = ({ aspirant }: { aspirant: Aspirant }) => {
+  const AspirantDetailsDialog = ({ aspirant, activeTab, setActiveTab }: { aspirant: Aspirant, activeTab: string, setActiveTab: (tab: string) => void }) => {
+    // FIX: Removed local state, now using controlled props from parent
+    
     const currentStatus = aspirant.promoted_to_candidate ? "promoted_to_candidate"
         : aspirant.screening_result ? aspirant.screening_result
         : aspirant.screening_scheduled_at ? "screening_scheduled"
@@ -432,11 +447,16 @@ Please prepare all required documents and be punctual.`;
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="info" className="w-full mt-4">
+        <Tabs 
+            // FIX: Use controlled value and setter from the parent AdminAspirants component
+            value={activeTab} 
+            onValueChange={setActiveTab} 
+            className="w-full mt-4"
+        >
           <TabsList className="grid w-full grid-cols-1 lg:grid-cols-3 h-auto">
             <TabsTrigger value="info">Applicant Info</TabsTrigger> {/* 1st Tab: Applicant Info */}
             <TabsTrigger value="review">Admin Review</TabsTrigger> {/* 2nd Tab: Admin Review */}
-            <TabsTrigger value="screening">Screening</TabsTrigger> {/* 3rd Tab: Screening */}{/* 4th Tab: Other Documents */}
+            <TabsTrigger value="screening">Screening</TabsTrigger> {/* 3rd Tab: Screening */}
           </TabsList>
 
           {/* --- TAB 1: Applicant Info --- */}
@@ -561,6 +581,7 @@ Please prepare all required documents and be punctual.`;
                         <Textarea
                             id="admin_review_notes"
                             value={actionData.admin_review_notes || ''}
+                            // FIX: Use the parent's setter to update actionData
                             onChange={(e) => setActionData({ ...actionData, admin_review_notes: e.target.value })}
                             placeholder="Enter notes for the aspirant..."
                             rows={3}
@@ -583,6 +604,7 @@ Please prepare all required documents and be punctual.`;
                                 <Textarea
                                     id="conditional_reason"
                                     value={actionData.conditional_reason || ''}
+                                    // FIX: Use the parent's setter to update actionData
                                     onChange={(e) => setActionData({ ...actionData, conditional_reason: e.target.value })}
                                     placeholder="Explain what needs to be resubmitted..."
                                     rows={3}
@@ -596,6 +618,7 @@ Please prepare all required documents and be punctual.`;
                                     id="resubmission_deadline"
                                     type="datetime-local"
                                     value={actionData.resubmission_deadline}
+                                    // FIX: Use the parent's setter to update actionData
                                     onChange={(e) => setActionData({ ...actionData, resubmission_deadline: e.target.value })}
                                     disabled={aspirant.promoted_to_candidate}
                                 />
@@ -619,6 +642,7 @@ Please prepare all required documents and be punctual.`;
                     id="screening_scheduled_at"
                     type="datetime-local"
                     value={actionData.screening_scheduled_at}
+                    // FIX: Use the parent's setter to update actionData
                     onChange={(e) => setActionData({ ...actionData, screening_scheduled_at: e.target.value })}
                     disabled={aspirant.promoted_to_candidate}
                   />
@@ -642,6 +666,7 @@ Please prepare all required documents and be punctual.`;
                   <Label htmlFor="screening_result">Screening Result</Label>
                   <Select
                     value={actionData.screening_result}
+                    // FIX: Use the parent's setter to update actionData
                     onValueChange={(v) => setActionData({ ...actionData, screening_result: v })}
                     disabled={aspirant.promoted_to_candidate}
                   >
@@ -660,6 +685,7 @@ Please prepare all required documents and be punctual.`;
                   <Textarea
                     id="screening_notes"
                     value={actionData.screening_notes || ''}
+                    // FIX: Use the parent's setter to update actionData
                     onChange={(e) => setActionData({ ...actionData, screening_notes: e.target.value })}
                     placeholder="Enter notes from the screening panel..."
                     rows={3}
@@ -878,7 +904,11 @@ Please prepare all required documents and be punctual.`;
                                 </Button>
                               </DialogTrigger>
                               {selectedAspirant && selectedAspirant.id === aspirant.id && (
-                                <AspirantDetailsDialog aspirant={selectedAspirant} />
+                                <AspirantDetailsDialog 
+                                    aspirant={selectedAspirant} 
+                                    activeTab={activeDialogTab}
+                                    setActiveTab={setActiveDialogTab}
+                                />
                               )}
                             </Dialog>
                           </TableCell>
