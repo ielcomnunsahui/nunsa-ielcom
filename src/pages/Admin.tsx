@@ -193,7 +193,7 @@ const Admin = () => {
               />
               <div>
                 <h1 className="text-xl sm:text-3xl font-extrabold text-gray-900">
-                  Electoral Admin Hub
+                  Electoral Admin System
                 </h1>
                 <p className="text-sm sm:text-md text-gray-600 flex items-center">
                     <Shield className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-blue-600"/>

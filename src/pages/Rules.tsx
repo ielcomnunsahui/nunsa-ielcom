@@ -135,11 +135,11 @@ function RulesPage() {
           {positions.map((position, index) => (
             <div
               key={index}
-              className="border border-border rounded-lg p-4 bg-gray-50 dark:bg-gray-700/50 transition-shadow hover:shadow-md"
+              className="border border-border rounded-lg p-4 bg-muted/30 transition-shadow hover:shadow-md"
             >
               <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 bg-[#0f7cff]/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <position.icon className="w-4 h-4 text-[#0f7cff]" />
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <position.icon className="w-4 h-4 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">
@@ -262,7 +262,7 @@ function RulesPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 font-inter">
+      <div className="min-h-screen bg-background">
         {/* Navbar component (assumed fixed/sticky) */}
         <Navbar />
 
@@ -272,35 +272,35 @@ function RulesPage() {
           {/* Hero Section */}
           <div className="text-center mb-16 print:mb-8">
             <div className="flex justify-center mb-6 print:hidden">
-              <div className="w-20 h-20 bg-[#0f7cff] rounded-3xl flex items-center justify-center">
-                <Scale className="h-10 w-10 text-white" />
+              <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center shadow-lg">
+                <Scale className="h-10 w-10 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-4xl md:text-5xl font-extrabold text-foreground mb-2">
               NUNSA HUI Electoral Rules
             </h1>
             <Badge 
                 variant="outline" 
-                className="mt-2 text-gray-600 font-bold dark:text-gray-300 leading-relaxed print:text-base print:text-black text-base py-1 px-3"
+                className="mt-2 text-muted-foreground font-bold leading-relaxed print:text-base print:text-black text-base py-1 px-3 border-border"
             >
               (AS AMENDED, SEPTEMBER 2025)
             </Badge>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed mt-4 print:text-base print:text-black">
-              The complete set of rules governing all electoral processes of the Nigerian Universities Nursing Students’ Association (NUNSA) - Al-Hikmah University Chapter.
+            <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed mt-4 print:text-base print:text-black">
+              The complete set of rules governing all electoral processes of the Nigerian Universities Nursing Students' Association (NUNSA) - Al-Hikmah University Chapter.
             </p>
             
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4 mt-8 print:hidden">
               <button
                 onClick={handlePrint}
-                className="flex items-center justify-center space-x-2 bg-[#0f7cff] hover:bg-[#0d6edb] text-white px-6 py-3 rounded-2xl font-semibold transition-colors"
+                className="flex items-center justify-center space-x-2 bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-3 rounded-2xl font-semibold transition-colors h-12"
               >
                 <Printer className="h-5 w-5" />
                 <span>Print Rules</span>
               </button>
               <button
                 onClick={handleDownload}
-                className="flex items-center justify-center space-x-2 bg-white dark:bg-gray-800 border-2 border-[#0f7cff] text-[#0f7cff] hover:bg-[#0f7cff] hover:text-white px-6 py-3 rounded-2xl font-semibold transition-colors"
+                className="flex items-center justify-center space-x-2 bg-background border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground px-6 py-3 rounded-2xl font-semibold transition-colors h-12"
               >
                 <Download className="h-5 w-5" />
                 <span>Download Full Document</span>
@@ -312,7 +312,7 @@ function RulesPage() {
           {/* Constitution Sections: Accordion */}
           <div className="max-w-5xl mx-auto">
             {/* Initial Important Notice */}
-            <Card className="mb-8 border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/10 dark:border-orange-700 shadow-md">
+            <Card className="mb-8 border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/10 shadow-md">
               <CardContent className="flex items-start gap-4 p-6">
                 <AlertTriangle className="h-6 w-6 text-orange-600 flex-shrink-0 mt-1" />
                 <div>
@@ -333,27 +333,27 @@ function RulesPage() {
                 return (
                   <div
                     key={section.id}
-                    className="constitution-section bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden" 
+                    className="constitution-section bg-card rounded-xl shadow-lg border border-border overflow-hidden" 
                   >
                     {/* ACCORDION BUTTON: Hidden when printing */}
                     <button
                       onClick={() => toggleSection(section.id)}
-                      className="w-full p-6 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors print:hidden focus:outline-none focus:ring-2 focus:ring-[#0f7cff]/50"
+                      className="w-full p-6 text-left hover:bg-muted/50 transition-colors print:hidden focus:outline-none focus:ring-2 focus:ring-primary/50 touch-manipulation"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="w-10 h-10 bg-[#0f7cff] rounded-lg flex items-center justify-center flex-shrink-0">
-                            <IconComponent className="h-5 w-5 text-white" />
+                          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                            <IconComponent className="h-5 w-5 text-primary-foreground" />
                           </div>
-                          <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">
+                          <h2 className="text-lg md:text-xl font-bold text-foreground">
                             {section.title}
                           </h2>
                         </div>
                         <div className="flex-shrink-0">
                           {isOpen ? (
-                            <ChevronUp className="h-5 w-5 text-gray-500" />
+                            <ChevronUp className="h-5 w-5 text-muted-foreground" />
                           ) : (
-                            <ChevronDown className="h-5 w-5 text-gray-500" />
+                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
                           )}
                         </div>
                       </div>
@@ -362,7 +362,7 @@ function RulesPage() {
                     {/* FIX 1: Accordion Content - Only render when isOpen is TRUE and HIDE when printing */}
                     {isOpen && (
                       <div className="px-6 pb-6 pt-0 transition-all duration-300 ease-in-out print:hidden">
-                        <div className="prose max-w-none text-gray-700 dark:text-gray-300">
+                        <div className="prose max-w-none text-muted-foreground">
                           {section.content}
                         </div>
                       </div>
@@ -386,9 +386,9 @@ function RulesPage() {
 
           {/* Quick Navigation (Hidden in print) */}
           <div className="max-w-5xl mx-auto mt-16 print:hidden">
-            <Card className="rounded-2xl shadow-xl">
+            <Card className="rounded-2xl shadow-xl border-border">
               <CardHeader className="p-6 pb-0">
-                 <CardTitle className="text-center text-2xl">Quick Navigation</CardTitle>
+                 <CardTitle className="text-center text-2xl text-foreground">Quick Navigation</CardTitle>
                  <CardDescription className="text-center">Jump to key election pages.</CardDescription>
               </CardHeader>
               <CardContent className="p-8">
@@ -396,45 +396,45 @@ function RulesPage() {
                   {/* Item 1: Homepage */}
                   <Link
                     to="/"
-                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-muted transition-colors group touch-manipulation"
                   >
-                    <div className="w-10 h-10 bg-[#0f7cff] rounded-xl flex items-center justify-center group-hover:bg-[#0d6edb] transition-colors">
-                      <Home className="h-5 w-5 text-white" />
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center group-hover:bg-primary/90 transition-colors">
+                      <Home className="h-5 w-5 text-primary-foreground" />
                     </div>
-                    <p className="font-semibold text-gray-900 dark:text-white text-center text-sm">Homepage</p>
+                    <p className="font-semibold text-foreground text-center text-sm">Homepage</p>
                   </Link>
 
                   {/* Item 2: Register */}
                   <Link
                     to="/register"
-                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-muted transition-colors group touch-manipulation"
                   >
                     <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center group-hover:bg-green-600 transition-colors">
                       <UserPlus className="h-5 w-5 text-white" />
                     </div>
-                    <p className="font-semibold text-gray-900 dark:text-white text-center text-sm">Register to Vote</p>
+                    <p className="font-semibold text-foreground text-center text-sm">Register to Vote</p>
                   </Link>
                   
                   {/* Item 3: Apply */}
                   <Link
                     to="/aspirant-login"
-                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-muted transition-colors group touch-manipulation"
                   >
                     <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center group-hover:bg-purple-600 transition-colors">
                       <Trophy className="h-5 w-5 text-white" />
                     </div>
-                    <p className="font-semibold text-gray-900 dark:text-white text-center text-sm">Apply for Position</p>
+                    <p className="font-semibold text-foreground text-center text-sm">Apply for Position</p>
                   </Link>
 
                   {/* Item 4: Live Results */}
                   <Link
                     to="/results"
-                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
+                    className="flex flex-col items-center space-y-2 p-4 rounded-xl hover:bg-muted transition-colors group touch-manipulation"
                   >
                     <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center group-hover:bg-indigo-600 transition-colors">
                       <Eye className="h-5 w-5 text-white" />
                     </div>
-                    <p className="font-semibold text-gray-900 dark:text-white text-center text-sm">View Live Results</p>
+                    <p className="font-semibold text-foreground text-center text-sm">View Live Results</p>
                   </Link>
                 </div>
               </CardContent>
@@ -443,7 +443,7 @@ function RulesPage() {
         </main>
 
         {/* Footer (Hidden in print) */}
-        < Footer />
+        <Footer />
 
         {/* Global Print Styles to ensure all sections are printed */}
         <style>{`

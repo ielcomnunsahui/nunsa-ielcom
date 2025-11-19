@@ -115,3 +115,130 @@ All colors MUST be HSL.
     background: var(--gradient-hero);
   }
 }
+
+/* ============================================ */
+/* MOBILE TOUCH OPTIMIZATION FIXES */
+/* ============================================ */
+
+@layer base {
+  /* Global touch behavior optimization */
+  * {
+    /* Prevent double-tap zoom on mobile */
+    touch-action: manipulation;
+    /* Remove tap highlight on mobile browsers */
+    -webkit-tap-highlight-color: transparent;
+    /* Improve scrolling performance on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Allow vertical scrolling for scrollable containers */
+  [class*="overflow-y-auto"],
+  [class*="overflow-y-scroll"] {
+    touch-action: pan-y;
+  }
+
+  /* Allow horizontal scrolling for scrollable containers */
+  [class*="overflow-x-auto"],
+  [class*="overflow-x-scroll"] {
+    touch-action: pan-x;
+  }
+
+  /* Improve button and link touch targets */
+  button,
+  a,
+  [role="button"],
+  [role="link"] {
+    /* Ensure minimum touch target size of 44x44px */
+    min-height: 44px;
+    min-width: 44px;
+    /* Prevent text selection on touch */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Improve tap response */
+    cursor: pointer;
+  }
+
+  /* Prevent hover effects on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    /* Remove transform on hover for touch devices */
+    .hover\:scale-\[1\.03\]:hover,
+    .hover\:scale-105:hover,
+    .hover\:scale-110:hover {
+      transform: none !important;
+    }
+
+    /* Use active state instead of hover on touch devices */
+    button:active,
+    a:active,
+    [role="button"]:active {
+      opacity: 0.8;
+      transform: scale(0.98);
+    }
+  }
+
+  /* Fix for iOS Safari button styling */
+  button,
+  input[type="button"],
+  input[type="submit"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Prevent zoom on input focus (iOS Safari) */
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Improve scrolling on mobile */
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Fix for sticky elements on mobile */
+  .sticky,
+  .fixed {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+}
+
+/* Mobile-specific utility classes */
+@layer utilities {
+  /* Touch-friendly spacing */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Prevent text selection */
+  .no-select {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Active state for touch */
+  .touch-active:active {
+    @apply opacity-80 scale-95;
+  }
+
+  /* Safe area padding for notched devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}

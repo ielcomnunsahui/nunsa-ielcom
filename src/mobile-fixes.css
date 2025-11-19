@@ -1,0 +1,76 @@
+/* ================================================================== */
+/* 1. GLOBAL SAFE FIXES (Always Active)                               */
+/* These improve the app feel without breaking layout.                  */
+/* ================================================================== */
+
+/* Prevent pull-to-refresh bounce only on the HTML element */
+html {
+  overscroll-behavior-y: none;
+  -webkit-text-size-adjust: 100%; /* Prevent font scaling rotation */
+}
+
+/* Smooth scrolling for the root container, NOT the body (prevents locking) */
+#root {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix iOS Input Zoom (Text size must be 16px+ on mobile to prevent zoom) */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important; /* Crucial for iOS */
+  }
+}
+
+/* Remove 300ms Tap Delay & Gray Highlight */
+a, button, input, select, textarea, [role="button"] {
+  touch-action: manipulation; /* Removes tap delay */
+  -webkit-tap-highlight-color: transparent; /* Removes gray box */
+}
+
+/* Safe Area Insets (Apply .safe-padding to your main container or navbar) */
+.safe-padding-top {
+  padding-top: env(safe-area-inset-top, 20px);
+}
+.safe-padding-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+/* ================================================================== */
+/* 2. THE "LOCK" STATE (Only active when Dialog is Open)              */
+/* Toggle this class on <body> using JS when opening a modal.         */
+/* ================================================================== */
+
+body.modal-open {
+  /* This freezes the background content */
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  
+  /* Maintain current scroll position visually (optional, requires JS to set top) */
+  /* top: -${window.scrollY}px; */ 
+}
+
+/* ================================================================== */
+/* 3. HARDWARE ACCELERATION (Specific Use Only)                       */
+/* ================================================================== */
+
+/* CRITICAL FIX: 
+   We removed `.fixed` from here. It was overriding the centering 
+   transforms of your dialogs. Only apply this to sticky headers.
+*/
+.sticky-header {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}

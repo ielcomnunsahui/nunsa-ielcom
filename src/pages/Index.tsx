@@ -397,7 +397,7 @@ const Index = () => {
                 {/* ========================================================= */}
                 <section className="py-16 md:py-24 px-4 bg-gray-100 dark:bg-gray-800">
                     
-                        
+                         
                         <ElectionTimeline />
                    
                 </section>

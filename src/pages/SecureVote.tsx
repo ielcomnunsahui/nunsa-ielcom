@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Vote as VoteIcon, 
@@ -13,11 +13,12 @@ import {
   AlertTriangle, 
   Shield 
 } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+// FIXED: Imported RadioGroup here
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Define strict types for components
 interface Candidate {
@@ -51,7 +52,6 @@ interface VoterInfo {
 }
 
 const Vote = () => {
-  // Removed unused 'votes' state
   const [voter, setVoter] = useState<VoterInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -68,15 +68,13 @@ const Vote = () => {
     selections[pos.name] && selections[pos.name].length > 0
   ).length;
 
-  // Helper to get candidate name for the confirmation dialog (FIX)
+  // Helper to get candidate name for the confirmation dialog
   const getCandidateName = (candidateId: string) => {
     return candidates.find(c => c.id === candidateId)?.full_name || 'No selection';
   };
 
-  // FIX: Moved logic inside useEffect to resolve the exhaustive-deps warning (already done, but clean)
   useEffect(() => {
     const checkAuthAndLoadData = async () => {
-      // ... (Auth and Data Loading Logic remains the same) ...
       try {
         const raw = localStorage.getItem("voterSession");
         if (!raw) {
@@ -194,18 +192,14 @@ const Vote = () => {
   const handleSubmitVote = async () => {
     if (!voter) return; 
 
-    // Validate all positions have selections (optional, but good practice for a full ballot)
     if (completedPositionsCount < totalPositions) {
       toast({
         title: "Partial Ballot",
         description: `You have not voted for all positions. You can still submit, but please review.`,
-        variant: "warning",
+        variant: "default", // Changed from warning to default as warning isn't standard shadcn
       });
-      // Optionally stop submission here if voting is mandatory for all positions
-      // For now, allow partial submission but give a final warning
     }
     
-    // Perform final check before submission
     if (completedPositionsCount === 0) {
       toast({
         title: "No Votes Selected",
@@ -218,7 +212,6 @@ const Vote = () => {
     setIsSubmitting(true);
 
     try {
-      // Call edge function to submit vote
       const { error } = await supabase.functions.invoke("submit-vote", {
         body: { voterId: voter.id, selections },
       });
@@ -230,7 +223,6 @@ const Vote = () => {
         description: "Thank you for participating in the election.",
       });
 
-      // CRITICAL: Clear voter session to prevent re-access (Zero-Trust principle)
       localStorage.removeItem("voterSession");
       
       setTimeout(() => navigate("/results", { replace: true }), 2000);
@@ -245,7 +237,7 @@ const Vote = () => {
       });
     } finally {
       setIsSubmitting(false);
-      setShowConfirmation(false); // Close dialog on success/failure
+      setShowConfirmation(false);
     }
   };
 
@@ -264,79 +256,116 @@ const Vote = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
       <Navbar />
       
-      {/* Dialogue wraps everything so its trigger can be in main content or fixed footer */}
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        
-        {/* Added mobile-only bottom padding to ensure content is visible above the fixed footer */}
-        <main className="pt-24 px-4 pb-28 sm:pb-12"> 
-          <div className="container mx-auto max-w-4xl">
-            {/* Header */}
-            <div className="text-center mb-8 animate-fade-in">
-              <div className="inline-flex items-center justify-center p-4 bg-gradient-success rounded-full shadow-success-glow mb-4">
-                <VoteIcon className="w-8 h-8 text-success-foreground" />
-              </div>
-              <h1 className="text-4xl font-bold mb-2 text-foreground">
-                Cast Your Vote
-              </h1>
-              <p className="text-lg text-muted-foreground">
-                Make your selection for each position
-              </p>
-              {voter?.email && (
-                <p className="text-sm text-muted-foreground mt-2">
-                  Voting as: **{voter.email}**
-                </p>
-              )}
+      {/* MAIN CONTENT - Now separated from Dialog logic */}
+      <main className="pt-24 px-4 pb-28 sm:pb-12"> 
+        <div className="container mx-auto max-w-4xl">
+          {/* Header */}
+          <div className="text-center mb-8 animate-fade-in">
+            <div className="inline-flex items-center justify-center p-4 bg-primary/10 rounded-full shadow-lg mb-4">
+              <VoteIcon className="w-8 h-8 text-primary" />
             </div>
+            <h1 className="text-4xl font-bold mb-2 text-foreground">
+              Cast Your Vote
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Make your selection for each position
+            </p>
+            {voter?.email && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Voting as: <span className="font-semibold">{voter.email}</span>
+              </p>
+            )}
+          </div>
 
-            {/* Positions */}
-            <div className="space-y-8">
-              {positions.map((position, index) => {
-                const positionCandidates = candidates.filter((c) => c.position === position.name);
-                const isSelected = completedPositionsCount > index;
+          {/* Positions */}
+          <div className="space-y-8">
+            {positions.map((position, index) => {
+              const positionCandidates = candidates.filter((c) => c.position === position.name);
+              const isSelected = (selections[position.name] || []).length > 0;
 
-                return (
-                  <Card key={position.id} className="p-4 sm:p-6 animate-fade-in" style={{animationDelay: `${index * 0.1}s`}}>
-                    <div className="mb-6 border-b pb-4">
-                      <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center">
-                        {position.name}
-                        {isSelected && <CheckCircle2 className="w-5 h-5 ml-3 text-success" />}
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        {position.vote_type === "single" 
-                          ? "Select one candidate" 
-                          : `Select up to ${position.max_selections} candidate(s)`}
-                      </p>
-                    </div>
+              return (
+                <Card key={position.id} className="p-4 sm:p-6 animate-fade-in border-border shadow-xl" style={{animationDelay: `${index * 0.1}s`}}>
+                  <div className="mb-6 border-b pb-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-foreground flex items-center">
+                      {position.name}
+                      {isSelected && <CheckCircle2 className="w-5 h-5 ml-3 text-green-500" />}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {position.vote_type === "single" 
+                        ? "Select one candidate" 
+                        : `Select up to ${position.max_selections} candidate(s)`}
+                    </p>
+                  </div>
 
-                    {/* Candidate Selection List */}
-                    <div className="grid grid-cols-1 gap-4">
-                      {positionCandidates.map((candidate) => {
+                  {/* Candidate Selection List */}
+                  <div className="grid grid-cols-1 gap-4">
+                    {/* BEGIN FIX: Conditionally wrap RadioGroupItems in RadioGroup */}
+                    {position.vote_type === "single" ? (
+                      <RadioGroup
+                        value={selections[position.name]?.[0] || ""}
+                        onValueChange={(value) => handleSingleSelection(position.name, value)}
+                      >
+                        {positionCandidates.map((candidate) => {
+                          const isCandidateSelected = selections[position.name]?.includes(candidate.id);
+                          return (
+                            <div
+                              key={candidate.id}
+                              className={`flex items-center space-x-4 p-3 sm:p-4 rounded-lg border transition-all cursor-pointer touch-manipulation ${
+                                isCandidateSelected
+                                  ? "border-primary bg-primary/5 shadow-md"
+                                  : "border-border hover:border-primary/50"
+                              }`}
+                              // Removed onClick here, relies on RadioGroup/Label
+                            >
+                              <div className="flex items-center h-full">
+                                {/* Now a direct child of RadioGroup */}
+                                <RadioGroupItem value={candidate.id} id={candidate.id} className="flex-shrink-0" />
+                              </div>
+                              
+                              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
+                                {candidate.picture_url ? (
+                                  <img
+                                    src={candidate.picture_url}
+                                    alt={candidate.full_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xl sm:text-2xl font-bold text-muted-foreground">
+                                    {candidate.full_name.charAt(0)}
+                                  </span>
+                                )}
+                              </div>
+                              <Label htmlFor={candidate.id} className="flex-1 cursor-pointer text-base sm:text-lg font-semibold min-w-0">
+                                {candidate.full_name}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </RadioGroup>
+                    ) : (
+                      // Multiple selection logic (Checkboxes) remains the same
+                      positionCandidates.map((candidate) => {
                         const isCandidateSelected = selections[position.name]?.includes(candidate.id);
                         return (
                           <div
                             key={candidate.id}
-                            className={`flex items-center space-x-4 p-3 sm:p-4 rounded-lg border ${
+                            className={`flex items-center space-x-4 p-3 sm:p-4 rounded-lg border transition-all cursor-pointer touch-manipulation ${
                               isCandidateSelected
                                 ? "border-primary bg-primary/5 shadow-md"
                                 : "border-border hover:border-primary/50"
-                            } transition-all cursor-pointer`}
-                            onClick={() => position.vote_type === "single" 
-                              ? handleSingleSelection(position.name, candidate.id) 
-                              : handleMultipleSelection(position.name, candidate.id, position)
-                            }
+                            }`}
+                            onClick={() => handleMultipleSelection(position.name, candidate.id, position)}
                           >
-                            {position.vote_type === "single" ? (
-                              <RadioGroupItem value={candidate.id} id={candidate.id} checked={isCandidateSelected} className="flex-shrink-0" />
-                            ) : (
-                              <Checkbox
-                                id={candidate.id}
-                                checked={isCandidateSelected}
-                                className="flex-shrink-0"
-                              />
-                            )}
+                            <div className="flex items-center h-full">
+                                <Checkbox
+                                    id={candidate.id}
+                                    checked={isCandidateSelected}
+                                    className="flex-shrink-0"
+                                />
+                            </div>
                             
                             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-muted flex items-center justify-center border-2 border-border overflow-hidden flex-shrink-0">
                               {candidate.picture_url ? (
@@ -356,102 +385,103 @@ const Vote = () => {
                             </Label>
                           </div>
                         );
-                      })}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Desktop/Tablet Submission Area (Hidden on Mobile) */}
-            <Card className="p-6 mt-8 bg-muted/30 hidden sm:block">
-              <div className="flex items-start gap-3 mb-6">
-                <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="font-semibold mb-2 text-foreground">Before You Submit:</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• Review all your selections carefully</li>
-                    <li>• Once submitted, you cannot change your vote</li>
-                    <li>• Your vote is completely anonymous</li>
-                    <li>• Results will be available immediately after voting closes</li>
-                  </ul>
-                </div>
-              </div>
-              
-              {/* Desktop/Tablet Submit Button (Dialog Trigger) */}
-              <div className="mt-6 text-center">
-                <DialogTrigger asChild>
-                  <Button
-                    variant="vote"
-                    size="lg"
-                    disabled={isSubmitting || completedPositionsCount === 0}
-                    className="px-12 w-full max-w-sm"
-                  >
-                    <VoteIcon className="w-5 h-5 mr-2" />
-                    Submit My Votes ({completedPositionsCount}/{totalPositions})
-                  </Button>
-                </DialogTrigger>
-
-                {completedPositionsCount < totalPositions && (
-                  <p className="text-sm text-muted-foreground mt-4">
-                    <AlertTriangle className="w-4 h-4 inline mr-1 text-warning"/> You have **{totalPositions - completedPositionsCount}** position(s) unselected. We recommend voting for all.
-                  </p>
-                )}
-              </div>
-            </Card>
-          </div>
-        </main>
-
-        {/* MOBILE FIXED FOOTER for Submission (Hidden on sm+) */}
-        <div className="fixed bottom-0 left-0 right-0 z-50 p-4 border-t bg-card shadow-[0_-4px_6px_-1px_rgb(0_0_0_/_0.1)] sm:hidden">
-            {completedPositionsCount < totalPositions && (
-                <Alert className="mb-2 p-2 border-warning text-xs">
-                    <AlertTriangle className="w-4 h-4 text-warning mr-2"/>
-                    <AlertDescription className="text-muted-foreground">
-                        **{totalPositions - completedPositionsCount}** position(s) remaining.
-                    </AlertDescription>
-                </Alert>
-            )}
-            <DialogTrigger asChild>
-                <Button
-                    variant="vote"
-                    size="lg"
-                    disabled={isSubmitting || completedPositionsCount === 0}
-                    className="w-full"
-                >
-                    {isSubmitting ? (
-                        <>
-                            <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                            Submitting...
-                        </>
-                    ) : (
-                        <>
-                            <VoteIcon className="w-5 h-5 mr-2" />
-                            Submit My Votes ({completedPositionsCount}/{totalPositions})
-                        </>
+                      })
                     )}
-                </Button>
-            </DialogTrigger>
+                    {/* END FIX */}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Desktop/Tablet Submission Area (Hidden on Mobile) */}
+          <Card className="p-6 mt-8 bg-muted/30 hidden sm:block border-border">
+            <div className="flex items-start gap-3 mb-6">
+              <AlertCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold mb-2 text-foreground">Before You Submit:</h3>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Review all your selections carefully</li>
+                  <li>• Once submitted, you cannot change your vote</li>
+                  <li>• Your vote is completely anonymous</li>
+                  <li>• Results will be available immediately after voting closes</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="mt-6 text-center">
+              {/* DIRECT BUTTON with onClick, removed DialogTrigger */}
+              <Button
+                variant="default"
+                size="lg"
+                disabled={isSubmitting || completedPositionsCount === 0}
+                onClick={() => setShowConfirmation(true)}
+                className="px-12 w-full max-w-sm bg-primary hover:bg-primary/90 h-12"
+              >
+                <VoteIcon className="w-5 h-5 mr-2" />
+                Submit My Votes ({completedPositionsCount}/{totalPositions})
+              </Button>
+
+              {completedPositionsCount < totalPositions && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  <AlertTriangle className="w-4 h-4 inline mr-1 text-orange-500"/> You have <span className="font-bold">{totalPositions - completedPositionsCount}</span> position(s) unselected. We recommend voting for all.
+                </p>
+              )}
+            </div>
+          </Card>
         </div>
-        
-        {/* Confirmation Dialog Content (Shared by both triggers) */}
+      </main>
+
+      {/* MOBILE FIXED FOOTER */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 p-4 border-t bg-card shadow-[0_-4px_6px_-1px_rgb(0_0_0_/_0.1)] sm:hidden">
+          {completedPositionsCount < totalPositions && (
+              <Alert className="mb-2 p-2 border-orange-500 text-xs">
+                  <AlertTriangle className="w-4 h-4 text-orange-500 mr-2"/>
+                  <AlertDescription className="text-muted-foreground">
+                      <span className="font-bold">{totalPositions - completedPositionsCount}</span> position(s) remaining.
+                  </AlertDescription>
+              </Alert>
+          )}
+          {/* DIRECT BUTTON with onClick, removed DialogTrigger */}
+          <Button
+              variant="default"
+              size="lg"
+              disabled={isSubmitting || completedPositionsCount === 0}
+              onClick={() => setShowConfirmation(true)}
+              className="w-full bg-primary hover:bg-primary/90 h-12"
+          >
+              {isSubmitting ? (
+                  <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Submitting...
+                  </>
+              ) : (
+                  <>
+                      <VoteIcon className="w-5 h-5 mr-2" />
+                      Submit My Votes ({completedPositionsCount}/{totalPositions})
+                  </>
+              )}
+          </Button>
+      </div>
+      
+      {/* CONFIRMATION DIALOG - Now placed safely at the bottom */}
+      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
-              <AlertTriangle className="w-5 h-5 text-warning" />
+              <AlertTriangle className="w-5 h-5 text-orange-500" />
               <span>Confirm Your Votes</span>
             </DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4">
-            <Alert className='border-warning text-warning-foreground'>
+            <Alert className='border-orange-500 bg-orange-50 dark:bg-orange-900/20'>
               <Shield className="h-4 w-4" />
               <AlertDescription>
                 Final Warning: Once submitted, your votes cannot be changed. Please review your selections carefully.
               </AlertDescription>
             </Alert>
 
-            {/* FIX: Correctly mapping over selections/positions */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2"> 
               {positions.map((position) => {
                 const selectedIds = selections[position.name] || [];
@@ -480,12 +510,12 @@ const Vote = () => {
                 Review Again
               </Button>
               <Button
-                variant="vote"
+                variant="default"
                 onClick={handleSubmitVote}
                 disabled={isSubmitting || completedPositionsCount === 0}
-                className="flex-1"
+                className="flex-1 bg-primary hover:bg-primary/90"
               >
-                {isSubmitting ? 'Submitting...' : `Confirm & Submit (${completedPositionsCount}/${totalPositions})`}
+                {isSubmitting ? 'Submitting...' : 'Confirm & Submit'}
               </Button>
             </div>
           </div>
