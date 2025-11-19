@@ -30,9 +30,6 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          {/* ---------------------------------------------------- */}
-          {/* 1. PUBLIC ROUTES (Accessible to everyone) */}
-          {/* ---------------------------------------------------- */}
           <Route path="/" element={<Index />} />
           <Route path="/results" element={<Results />} />
           <Route path="/login" element={<Login />} />
@@ -43,35 +40,19 @@ const App = () => (
           <Route path="/support" element={<SupportPage />} />
           <Route path="/candidates" element={<PublicCandidatesView />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
-          
-          {/* ---------------------------------------------------- */}
-          {/* 2. PROTECTED ROUTES (Requires Login) */}
-          {/* ---------------------------------------------------- */}
-          {/* Default protection for pages requiring any successful login */}
+         
           <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<Index />} /> {/* Or a generic dashboard */}
           </Route>
-          
-          {/* ---------------------------------------------------- */}
-          {/* 3. ROLE-SPECIFIC ROUTES (Requires Login + Role Check) */}
-          {/* ---------------------------------------------------- */}
-
-          {/* VOTER-SPECIFIC ACCESS (e.g., Voting) */}
-          {/* Only voters and admins can access the secure voting page */}
           <Route element={<ProtectedRoute allowedRoles={['voter', 'aspirant', 'admin']} />}>
           
           <Route path="/register" element={<Register />} />
               <Route path="/vote" element={<Vote />} />
           </Route>
-
-          {/* ASPIRANT-SPECIFIC ACCESS (Aspirant Dashboard & Application) */}
-          {/* Only aspirants and admins can access the aspirant tools */}
           <Route element={<ProtectedRoute allowedRoles={['aspirant', 'voter', 'admin']} />}>
               <Route path="/aspirant" element={<AspirantDashboard />} />
               <Route path="/aspirant/apply" element={<AspirantApplication />} />
           </Route>
-          
-          {/* ADMIN-SPECIFIC ACCESS */}
           {/* Only admins can access the admin dashboard */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
               <Route path="/admin" element={<Admin />} />

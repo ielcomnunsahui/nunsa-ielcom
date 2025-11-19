@@ -407,7 +407,7 @@ export function AdminTimeline() {
               <TableHead className="w-[180px]">Stage Name</TableHead>
               <TableHead className="w-[200px]">Start Time</TableHead>
               <TableHead className="w-[200px]">End Time</TableHead>
-              <TableHead>Link Text/ID</TableHead>
+             
               <TableHead>Color Class</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right w-[150px]">Actions</TableHead>
