@@ -297,6 +297,49 @@ const Login = () => {
                       required
                     />
                   </div>
+                  <div className="space-y-3 p-3 bg-muted/20 rounded-md text-xs text-muted-foreground">
+  <h3 className="font-semibold text-foreground text-sm">Terms & Data Protection Consent</h3>
+  <ul className="list-disc ml-4 space-y-1">
+    <li>
+      I consent to the verification of my matric number, email, and student status for
+      election eligibility.
+    </li>
+    <li>
+      I agree to the collection and secure storage of my biometric data (Face ID or
+      fingerprint) solely for identity verification and preventing multiple voting.
+    </li>
+    <li>
+      If biometrics are unavailable, I agree to receive OTP authentication via email or phone.
+    </li>
+    <li>
+      I understand that my data will be used only for voter registration, secure login,
+      aspirant screening, communication, and transparent election result processing.
+    </li>
+    <li>
+      I acknowledge that AHSS complies with the Nigeria Data Protection Regulation (NDPR)
+      and uses appropriate security measures to protect my data.
+    </li>
+    <li>
+      I understand that biometric data will be deleted after the election cycle.
+    </li>
+    <li>
+      By signing up, I confirm that all provided information is accurate and belongs to me.
+    </li>
+  </ul>
+
+  <div className="flex items-center space-x-2 mt-2">
+    <input
+      type="checkbox"
+      id="terms"
+      required
+      className="h-4 w-4 border-muted-foreground"
+    />
+    <label htmlFor="terms" className="text-xs text-foreground">
+      I have read and agree to the Terms & Data Protection Consent.
+    </label>
+  </div>
+</div>
+
 
                   <Button
                     type="submit"

@@ -161,12 +161,12 @@ function RulesPage() {
       icon: Users,
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>Must be a **bonafide student** of Al-Hikmah University, Ilorin.</li>
-          <li>Must be a **registered student** in the faculty of Nursing Sciences Students List.</li>
-          <li>Must have **paid current session fees**.</li>
-          <li>Must complete **voter registration** with a valid matric number.</li>
+          <li>Must be a bonafide student of Al-Hikmah University, Ilorin.</li>
+          <li>Must be a registered student in the faculty of Nursing Sciences Students List.</li>
+          <li>Must have paid current session fees.</li>
+          <li>Must complete voter registration with a valid matric number.</li>
           <li>Must verify identity via biometric authentication.</li>
-          <li>Each voter can vote **only once**.</li>
+          <li>Each voter can vote only once.</li>
           <li>One vote per position per student.</li>
         </ul>
       ),
@@ -178,11 +178,11 @@ function RulesPage() {
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
           <li>Must be a Bonafide student of Al-Hikmah University.</li>
-          <li>**Minimum CGPA requirement** varies by position (to be verified).</li>
+          <li>Minimum CGPA requirement varies by position (to be verified).</li>
           <li>Must not be on academic probation.</li>
           <li>Must submit all required documents.</li>
-          <li>Must pay **nomination fees** as specified.</li>
-          <li>Must attend **mandatory screening**.</li>
+          <li>Must pay nomination fees as specified.</li>
+          <li>Must attend mandatory screening.</li>
         </ul>
       ),
     },
@@ -192,10 +192,10 @@ function RulesPage() {
       icon: Vote,
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>Voting is conducted **electronically** via the official platform.</li>
-          <li>**Secret ballot system** ensures privacy and anonymity.</li>
+          <li>Voting is conducted electronically via the official platform.</li>
+          <li>**Secret ballot system ensures privacy and anonymity.</li>
           <li>The official Voting Period will be announced publicly.</li>
-          <li>No **proxy voting** allowed.</li>
+          <li>No proxy voting allowed.</li>
           <li>A vote, once submitted, cannot be changed.</li>
           <li>The system automatically prevents double voting.</li>
         </ul>
@@ -207,12 +207,12 @@ function RulesPage() {
       icon: Shield,
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>**Vote buying or selling** is strictly prohibited.</li>
-          <li>**Intimidation** of voters is a serious offense.</li>
+          <li>Vote buying or selling is strictly prohibited.</li>
+          <li>Intimidation of voters is a serious offense.</li>
           <li>Unauthorized access to voting systems or data is illegal.</li>
           <li>Impersonation of another voter is grounds for immediate disqualification.</li>
           <li>Disruption of the electoral process in any manner.</li>
-          <li>Violations may result in **Disciplinary actions, sanctions, or Disqualification**.</li>
+          <li>Violations may result in Disciplinary actions, sanctions, or Disqualification**.</li>
         </ul>
       ),
     },
@@ -222,15 +222,16 @@ function RulesPage() {
       icon: Clock,
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>**Sales of Form period:** 15th to 30th November, 2025.</li>
-          <li>**Screening:** 11th of November, 2025 (Please note potential conflict with form sales deadline).</li>
-          <li>**Campaign period:** Starts after Purchase of form by Aspirants.</li>
-          <li>**Campaign period Ends:** 24 hours before voting.</li>
-          <li>**Manifesto Day:** 13th of December, 2025.</li>
-          <li>**Election Day:** 14th of December, 2025.</li>
-          <li>**Voting period:** 8-42 hours (specific time to be announced).</li>
-          <li>**Results publication:** Within 24 hours of vote closure.</li>
-          <li>**Appeal period:** 48 hours after results publication.</li>
+          <li>Sales of Form period: 15th to 30th November, 2025.</li>
+          <li>Handing-Over to Care-Taker Committee/Pre-Induction: 27th November, 2025.</li>
+          <li>Screening: 8th of November, 2025 (Please note potential conflict with form sales deadline).</li>
+          <li>Campaign period: Starts after Purchase of form by Aspirants.</li>
+          <li>Campaign period Ends: 24 hours before voting.</li>
+          <li>Manifesto Day: 14th of December, 2025.</li>
+          <li>Election Day: 21st of December, 2025.</li>
+          <li>Voting period: 8-12 hours (specific time to be announced).</li>
+          <li>Results publication: Within 24 hours of vote closure.</li>
+          <li>Appeal period: 24 hours after results publication.</li>
         </ul>
       ),
     },
@@ -240,9 +241,9 @@ function RulesPage() {
       icon: AlertTriangle,
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>Written or email complaints must be submitted within **48 hours** to the IELCOM Secretary.</li>
+          <li>Written or email complaints must be submitted within 48 hours to the IELCOM Secretary.</li>
           <li>Appeals must be formally addressed to the Electoral Committee.</li>
-          <li>**Evidence** must accompany all complaints for consideration.</li>
+          <li>Evidence must accompany all complaints for consideration.</li>
           <li>Frivolous or unsubstantiated complaints may attract sanctions.</li>
           <li>The Electoral Commission's decision on appeals is final.</li>
           <li>Further legal action must be pursued through the NUNSA Constitution's stated channels only.</li>
