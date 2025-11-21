@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 // --- Configuration ---
 // MOCK: Set a fixed election end date for demonstration. 
 // This should be dynamically fetched from your database in a production environment.
-const ELECTION_END_TIME_MOCK = new Date('2025-11-20T00:53:59').getTime(); 
+const ELECTION_END_TIME_MOCK = new Date('2025-11-22T00:53:59').getTime(); 
 
 // --- Type Definitions ---
 interface Candidate {
@@ -423,7 +423,7 @@ const Results = () => {
               <BarChart3 className="w-10 h-10 text-white" />
             </div>
             <h1 className="text-3xl md:text-5xl font-extrabold mb-1 uppercase tracking-wide text-foreground">
-              INSTITUTIONAL ELECTION TALLY
+              LIVE ELECTION MONITORING
             </h1>
             <p className={`text-lg md:text-xl font-black ${isElectionLive ? 'text-red-600' : 'text-green-600'}`}>
               {isElectionLive ? "Real-Time Monitoring" : "Finalized Institutional Record"}
