@@ -9,10 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Loader2, LogIn, UserPlus, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/hooks/use-auth";
 
 const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // 1. NEW STATE: Track the consent checkbox status
+  const [isConsentChecked, setIsConsentChecked] = useState(false); 
+  
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
@@ -22,34 +27,25 @@ const Login = () => {
     password: "",
     confirmPassword: "",
   });
+  
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, role, isLoading: authLoading } = useAuth();
 
   // Get the return URL from location state or default to home
   const returnTo = location.state?.returnTo || "/";
 
   useEffect(() => {
     // Check if user is already logged in
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Check if user is admin
-        const { data: adminData } = await supabase
-          .from("admin_users")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle();
-
-        if (adminData) {
-          navigate("/admin");
-        } else {
-          navigate(returnTo);
-        }
+    if (!authLoading && user && role) {
+      if (role === "admin") {
+        navigate("/admin");
+      } else {
+        navigate(returnTo);
       }
-    };
-    checkUser();
-  }, [navigate, returnTo]);
+    }
+  }, [user, role, authLoading, navigate, returnTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,23 +60,12 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // Check if user is admin
-        const { data: adminData } = await supabase
-          .from("admin_users")
-          .select("*")
-          .eq("user_id", data.user.id)
-          .maybeSingle();
-
         toast({
           title: "Login Successful",
           description: `Welcome back, ${data.user.email}!`,
         });
 
-        if (adminData) {
-          navigate("/admin");
-        } else {
-          navigate(returnTo);
-        }
+        // The useEffect will handle navigation based on role
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -97,6 +82,9 @@ const Login = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // **NOTE: The button is disabled if consent is not checked. This check is primarily for redundancy
+    // or if the button disable is somehow bypassed (e.g., via script injection).**
     
     if (signupData.password !== signupData.confirmPassword) {
       toast({
@@ -115,6 +103,17 @@ const Login = () => {
       });
       return;
     }
+    
+    // Explicitly check for consent before starting API call
+    if (!isConsentChecked) {
+        toast({
+            title: "Consent Required",
+            description: "You must agree to the Terms & Data Protection Consent to create an account.",
+            variant: "destructive",
+        });
+        return;
+    }
+
 
     setIsLoading(true);
 
@@ -128,11 +127,11 @@ const Login = () => {
 
       if (data.user) {
         toast({
-          title: "Account Created",
-          description: "Your account has been created successfully. You can now log in.",
+          title: "Account Created Successfully",
+          description: "You now have full access to the platform. You can apply for positions, register as a voter, and participate in elections.",
         });
 
-        // Clear signup form and switch to login tab
+        // Clear form
         setSignupData({
           email: "",
           password: "",
@@ -158,6 +157,16 @@ const Login = () => {
     }
   };
 
+  // Show loading if auth is still loading
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center bg-gray-50 dark:bg-gray-900">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -172,7 +181,7 @@ const Login = () => {
               General Login
             </h1>
             <p className="text-lg text-muted-foreground">
-              Access your account for general platform features
+              Access all platform features - voting, aspirant applications, and more
             </p>
           </div>
 
@@ -297,54 +306,58 @@ const Login = () => {
                       required
                     />
                   </div>
+                  
                   <div className="space-y-3 p-3 bg-muted/20 rounded-md text-xs text-muted-foreground">
-  <h3 className="font-semibold text-foreground text-sm">Terms & Data Protection Consent</h3>
-  <ul className="list-disc ml-4 space-y-1">
-    <li>
-      I consent to the verification of my matric number, email, and student status for
-      election eligibility.
-    </li>
-    <li>
-      I agree to the collection and secure storage of my biometric data (Face ID or
-      fingerprint) solely for identity verification and preventing multiple voting.
-    </li>
-    <li>
-      If biometrics are unavailable, I agree to receive OTP authentication via email or phone.
-    </li>
-    <li>
-      I understand that my data will be used only for voter registration, secure login,
-      aspirant screening, communication, and transparent election result processing.
-    </li>
-    <li>
-      I acknowledge that AHSS complies with the Nigeria Data Protection Regulation (NDPR)
-      and uses appropriate security measures to protect my data.
-    </li>
-    <li>
-      I understand that biometric data will be deleted after the election cycle.
-    </li>
-    <li>
-      By signing up, I confirm that all provided information is accurate and belongs to me.
-    </li>
-  </ul>
+                    <h3 className="font-semibold text-foreground text-sm">Terms & Data Protection Consent</h3>
+                    <ul className="list-disc ml-4 space-y-1">
+                      <li>
+                        I consent to the verification of my matric number, email, and student status for
+                        election eligibility.
+                      </li>
+                      <li>
+                        I agree to the collection and secure storage of my biometric data (Face ID or
+                        fingerprint) solely for identity verification and preventing multiple voting.
+                      </li>
+                      <li>
+                        If biometrics are unavailable, I agree to receive OTP authentication via email or phone.
+                      </li>
+                      <li>
+                        I understand that my data will be used only for voter registration, secure login,
+                        aspirant screening, communication, and transparent election result processing.
+                      </li>
+                      <li>
+                        I acknowledge that AHSS complies with the Nigeria Data Protection Regulation (NDPR)
+                        and uses appropriate security measures to protect my data.
+                      </li>
+                      <li>
+                        I understand that biometric data will be deleted after the election cycle.
+                      </li>
+                      <li>
+                        By signing up, I confirm that all provided information is accurate and belongs to me.
+                      </li>
+                    </ul>
 
-  <div className="flex items-center space-x-2 mt-2">
-    <input
-      type="checkbox"
-      id="terms"
-      required
-      className="h-4 w-4 border-muted-foreground"
-    />
-    <label htmlFor="terms" className="text-xs text-foreground">
-      I have read and agree to the Terms & Data Protection Consent.
-    </label>
-  </div>
-</div>
-
+                    {/* 2. UPDATED CHECKBOX: Use state to control checked status */}
+                    <div className="flex items-center space-x-2 mt-2">
+                      <input
+                        type="checkbox"
+                        id="terms"
+                        // Removed 'required' attribute for React control
+                        checked={isConsentChecked}
+                        onChange={(e) => setIsConsentChecked(e.target.checked)}
+                        className="h-4 w-4 border-muted-foreground"
+                      />
+                      <label htmlFor="terms" className="text-xs text-foreground font-medium">
+                        I have read and agree to the Terms & Data Protection Consent.
+                      </label>
+                    </div>
+                  </div>
 
                   <Button
                     type="submit"
                     className="w-full bg-gradient-secondary"
-                    disabled={isLoading}
+                    // 3. UPDATED DISABLED PROP: Button is disabled if loading OR consent is not checked
+                    disabled={isLoading || !isConsentChecked}
                   >
                     {isLoading ? (
                       <>
@@ -365,28 +378,21 @@ const Login = () => {
 
           <div className="text-center mt-6 space-y-2">
             <p className="text-sm text-muted-foreground">
-              Looking for specific access?
+              Need admin access?
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 justify-center">
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/aspirant-login")}>
-                Aspirant Login
-              </Button>
-              <span className="hidden sm:inline text-muted-foreground">•</span>
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/voters-login")}>
-                Voter Login
-              </Button>
-              <span className="hidden sm:inline text-muted-foreground">•</span>
-              <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/admin-login")}>
-                Admin Login
-              </Button>
-            </div>
+            <Button variant="link" className="p-0 h-auto text-primary" onClick={() => navigate("/admin-login")}>
+              Admin Login
+            </Button>
           </div>
 
           <div className="mt-8 p-4 bg-muted/30 rounded-lg">
-            <h4 className="font-semibold text-sm mb-2 text-foreground">Need Help?</h4>
-            <p className="text-xs text-muted-foreground">
-              Contact the electoral commission for assistance with your account or access issues.
-            </p>
+            <h4 className="font-semibold text-sm mb-2 text-foreground">Full Platform Access</h4>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>• View and apply for leadership positions</li>
+              <li>• Register as a voter and participate in elections</li>
+              <li>• Access all election information and candidate profiles</li>
+              <li>• Track your applications and voting status</li>
+            </ul>
           </div>
         </div>
       </main>

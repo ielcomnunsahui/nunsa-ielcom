@@ -1,24 +1,18 @@
 import { useEffect, useState, useMemo } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-// NOTE: Removed local supabase and User imports as they are now encapsulated in use-auth.ts
 import { Loader2, AlertCircle } from "lucide-react";
-
-// NEW IMPORT: Use the centralized authentication hook
 import { useAuth } from "@/hooks/use-auth"; 
-import { Link } from "react-router-dom"; // Import Link for the Access Denied message
+import { Link } from "react-router-dom";
 
-// 1. Define Role Types (Keep this type definition here or import it from types.ts)
-// For now, keep it here for simplicity, assuming the useAuth hook exports the type if it was moved.
-// If you moved the type to use-auth.ts, you should import it here.
-type UserRole = 'voter' | 'aspirant' | 'admin' | 'unverified' | null;
+// Simplified Role Types - Only 'general' and 'admin'
+type UserRole = 'admin' | 'general' | null;
 
-// 2. The ProtectedRoute Component
+// The ProtectedRoute Component
 interface ProtectedRouteProps {
     allowedRoles?: UserRole[]; // Optional: restrict access to certain roles
 }
 
 const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-    // 3. USE THE CENTRAL AUTH HOOK
     const { user, role, isLoading } = useAuth();
     const location = useLocation();
 
@@ -46,15 +40,14 @@ const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
     // 3. Role/Authorization Check
     // ------------------------------------
     if (allowedRoles && role && !allowedRoles.includes(role)) {
-        // User is logged in but does not have the required role (e.g., Voter accessing Admin page)
+        // User is logged in but does not have the required role (e.g., General user accessing Admin page)
         return (
             <div className="min-h-screen flex flex-col justify-center items-center p-8 text-center bg-red-50 dark:bg-red-900/10">
                 <AlertCircle className="w-12 h-12 text-red-600 mb-4" />
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h1>
                 <p className="mt-2 text-gray-600 dark:text-gray-300">
-                    You do not have the required role ({allowedRoles.filter(r => r).join(' or ')}) to view this page.
+                    You do not have the required permissions to view this page.
                 </p>
-                {/* Ensure Link is imported from 'react-router-dom' if not already */}
                 <Link to="/" className="mt-4 text-indigo-600 hover:underline">Go to Home</Link>
             </div>
         );

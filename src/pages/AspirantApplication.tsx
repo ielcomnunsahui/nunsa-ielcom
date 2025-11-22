@@ -144,7 +144,7 @@ const AspirantApplication = () => {
           description: "Please log in to access the application form.",
           variant: "destructive",
         });
-        navigate("/VotersLogin", { state: { returnTo: "VotersLogin" } });
+        navigate("/aspirant-login", { state: { returnTo: "aspirant" } });
         return;
       }
 

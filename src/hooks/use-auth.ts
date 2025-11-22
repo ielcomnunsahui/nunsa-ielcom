@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 
-// Define Role Types
-type UserRole = 'voter' | 'aspirant' | 'admin' | 'unverified' | null;
+// Simplified Role Types - Only 'general' and 'admin'
+type UserRole = 'admin' | 'general' | null;
 
 // --- The Central useAuth Hook ---
 export const useAuth = () => {
@@ -22,44 +22,19 @@ export const useAuth = () => {
             return;
         }
 
-        // --- Fetch Role Information ---
-        let userRole: UserRole = 'unverified';
+        // --- Simplified Role Check ---
+        let userRole: UserRole = 'general'; // Default to general access for all authenticated users
 
-        // Check for Admin (Highest privilege)
+        // Check for Admin (Only special role)
         const { data: adminData } = await supabase
             .from('admin_users')
             .select('id')
             .eq('user_id', authUser.id)
             .limit(1)
             .single();
+        
         if (adminData) {
             userRole = 'admin';
-        } 
-        
-        // Check for Aspirant
-        else {
-            const { data: aspirantData } = await supabase
-                .from('aspirants')
-                .select('id')
-                .eq('user_id', authUser.id)
-                .limit(1)
-                .single();
-            if (aspirantData) {
-                userRole = 'aspirant';
-            }
-        }
-        
-        // Check for Voter (General privilege)
-        if (userRole === 'unverified') {
-            const { data: voterData } = await supabase
-                .from('voters')
-                .select('id')
-                .eq('user_id', authUser.id)
-                .limit(1)
-                .single();
-            if (voterData) {
-                userRole = 'voter';
-            }
         }
 
         setRole(userRole);
