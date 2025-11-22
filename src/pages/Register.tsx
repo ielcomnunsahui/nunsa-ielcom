@@ -75,7 +75,7 @@ const Register = () => {
           variant: "destructive",
         });
         setIsLoading(false);
-        navigate("/login");
+        navigate("/voters-login");
         return;
       }
 
@@ -193,7 +193,7 @@ const Register = () => {
                   <Button
                     variant="link"
                     className="p-0 h-auto text-primary"
-                    onClick={() => navigate("/login")}
+                    onClick={() => navigate("/voters-login")}
                   >
                     Login here
                   </Button>
@@ -205,7 +205,7 @@ const Register = () => {
                 email={email}
                 onComplete={() => {
                   setStep("verify");
-                  setTimeout(() => navigate("/login"), 2000);
+                  setTimeout(() => navigate("/voters-login"), 2000);
                 }}
               />
             ) : (

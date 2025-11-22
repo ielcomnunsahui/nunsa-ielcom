@@ -9,7 +9,7 @@ import { Vote as VoteIcon, Loader2, CheckCircle2, AlertCircle, User } from "luci
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-
+//"re_9LDcKg4u_FKG8tqiMa5rvLGNfi8SFAYi3"
 interface Candidate {
   id: string;
   full_name: string;

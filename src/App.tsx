@@ -30,32 +30,30 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
+          {/* Public routes - no authentication required */}
           <Route path="/" element={<Index />} />
           <Route path="/results" element={<Results />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/aspirant-login" element={<AspirantLogin />} />
-          <Route path="/voters-login" element={<VotersLogin />} />
           <Route path="/rules" element={<Rules />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/candidates" element={<PublicCandidatesView />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
          
-          <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Index />} /> {/* Or a generic dashboard */}
+          {/* Protected routes for general authenticated users */}
+          <Route element={<ProtectedRoute allowedRoles={['general', 'admin']} />}>
+            <Route path="/dashboard" element={<Index />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/aspirant" element={<AspirantDashboard />} />
+            <Route path="/aspirant/apply" element={<AspirantApplication />} />
+            <Route path="/voters-login" element={<VotersLogin />} />
+            <Route path="/vote" element={<Vote />} />
           </Route>
-          <Route element={<ProtectedRoute allowedRoles={['voter', 'aspirant', 'admin']} />}>
-          
-          <Route path="/register" element={<Register />} />
-              <Route path="/vote" element={<Vote />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['aspirant', 'voter', 'admin']} />}>
-              <Route path="/aspirant" element={<AspirantDashboard />} />
-              <Route path="/aspirant/apply" element={<AspirantApplication />} />
-          </Route>
-          {/* Only admins can access the admin dashboard */}
+
+          {/* Admin-only routes */}
           <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-              <Route path="/admin" element={<Admin />} />
+            <Route path="/admin" element={<Admin />} />
           </Route>
           
           {/* CATCH-ALL ROUTE (MUST remain last) */}
