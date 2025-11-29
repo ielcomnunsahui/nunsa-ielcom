@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
@@ -33,6 +33,8 @@ interface Position {
 interface ApplicationData {
   // Step 1: Personal
   photo: File | null;
+  photoPreviewUrl: string | null;
+  photoUploaded: boolean; // Track if photo was uploaded
   full_name: string;
   matric: string;
   department: string;
@@ -54,6 +56,8 @@ interface ApplicationData {
   
   // Step 5: Payment
   payment_proof: File | null;
+  paymentProofPreviewUrl: string | null;
+  paymentProofUploaded: boolean; // Track if payment proof was uploaded
 }
 
 // --- Zod Schemas ---
@@ -66,7 +70,7 @@ const departments = [
   "Nursing", "Anatomy", "Physiology", "Medical Lab Science", "MBBS", "Public Health"
 ];
 const levels = ["100L", "200L", "300L", "400L", "500L"];
-const TOTAL_STEPS = 6; // Updated to 6 for the new Review step
+const TOTAL_STEPS = 6;
 
 // --- Utility Components for Step 6 Review ---
 
@@ -105,6 +109,8 @@ const AspirantApplication = () => {
   const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
   const [applicationData, setApplicationData] = useState<ApplicationData>({
     photo: null,
+    photoPreviewUrl: null,
+    photoUploaded: false,
     full_name: "",
     matric: "",
     department: "",
@@ -118,6 +124,8 @@ const AspirantApplication = () => {
     cgpa: "",
     leadership_history: "",
     payment_proof: null,
+    paymentProofPreviewUrl: null,
+    paymentProofUploaded: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -126,71 +134,108 @@ const AspirantApplication = () => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [savedSteps, setSavedSteps] = useState<Set<number>>(new Set());
-  const [isConfirmed, setIsConfirmed] = useState(false); // New state for final declaration
+  const [isConfirmed, setIsConfirmed] = useState(false);
   
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+  const hasCheckedAuth = useRef(false);
+
+  // Auto-save functionality to prevent data loss
+  const autoSave = useCallback(async () => {
+    if (!user || currentStep === 6) return; // Don't auto-save on final step
+    
+    try {
+      const { photo, payment_proof, ...dataToSave } = applicationData;
+      
+      const progressData = {
+        data: {
+          ...dataToSave,
+          // Always save the upload status and preview URLs
+          photoUploaded: applicationData.photoUploaded,
+          paymentProofUploaded: applicationData.paymentProofUploaded,
+        },
+        currentStep,
+        savedSteps: Array.from(savedSteps),
+        lastSaved: new Date().toISOString()
+      };
+      
+      localStorage.setItem(`aspirant_draft_${user.id}`, JSON.stringify(progressData));
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+    }
+  }, [user, currentStep, applicationData, savedSteps]);
+
+  // Auto-save every 30 seconds and on data changes
+  useEffect(() => {
+    const interval = setInterval(autoSave, 30000); // Auto-save every 30 seconds
+    return () => clearInterval(interval);
+  }, [autoSave]);
+
+  useEffect(() => {
+    autoSave(); // Save on data changes
+  }, [applicationData, autoSave]);
 
   // Authentication check
-  const checkAuthentication = useCallback(async () => {
-    // ... (Authentication logic is kept the same for brevity)
+ const checkAuthentication = useCallback(async () => {
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser();
-      
       if (!authUser) {
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to access the application form.",
-          variant: "destructive",
-        });
+        toast({ title: "Login Required", description: "Please log in to continue.", variant: "destructive" });
         navigate("/aspirant-login", { state: { returnTo: "aspirant" } });
         return;
       }
-
       setUser(authUser);
-      setIsCheckingAuth(false);
-      
       await loadSavedProgress(authUser.id);
     } catch (error) {
-      console.error("Error checking authentication:", error);
-      toast({
-        title: "Authentication Error",
-        description: "Failed to verify authentication. Please try logging in again.",
-        variant: "destructive",
-      });
+      toast({ title: "Auth Error", description: "Please log in again.", variant: "destructive" });
       navigate("/login");
+    } finally {
+      setIsCheckingAuth(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate, toast]);
 
   useEffect(() => {
     checkAuthentication();
   }, [checkAuthentication]);
 
+  // Handle visibility change (Android returning from file picker)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // Restore draft silently
+        loadSavedProgress(user.id);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
+
   // Load saved progress from localStorage
   const loadSavedProgress = async (userId: string) => {
-    // ... (Loading logic is kept the same for brevity)
     try {
       const savedData = localStorage.getItem(`aspirant_draft_${userId}`);
       if (savedData) {
         const parsedData = JSON.parse(savedData);
         
-        // Ensure files are not loaded from string, they must be re-selected by user
+        // Restore all data including upload status
         const { photo, payment_proof, ...restData } = parsedData.data;
         
         setApplicationData(prev => ({ 
             ...prev, 
             ...restData, 
-            photo: null, 
-            payment_proof: null 
+            photo: null, // Files can't be restored, but we track upload status
+            payment_proof: null,
         }));
         setCurrentStep(parsedData.currentStep || 1);
         setSavedSteps(new Set(parsedData.savedSteps || []));
         
         toast({
           title: "Progress Restored",
-          description: "Your previous application progress has been restored (files must be re-uploaded).",
+          description: "Your previous progress has been restored. Files need to be re-uploaded for final submission.",
         });
       }
     } catch (error) {
@@ -204,22 +249,12 @@ const AspirantApplication = () => {
     
     setIsSaving(true);
     try {
-      // Exclude File objects from storage, as they cannot be serialized
-      const { photo, payment_proof, ...dataToSave } = applicationData;
-      
-      const progressData = {
-        data: dataToSave,
-        currentStep: step,
-        savedSteps: Array.from(savedSteps),
-        lastSaved: new Date().toISOString()
-      };
-      
-      localStorage.setItem(`aspirant_draft_${user.id}`, JSON.stringify(progressData));
+      await autoSave(); // Use the auto-save function
       setSavedSteps(prev => new Set([...prev, step]));
       
       toast({
         title: "Progress Saved",
-        description: `Step ${step} has been saved. Files must be re-uploaded on final submission.`,
+        description: `Step ${step} has been saved.`,
       });
     } catch (error) {
       console.error("Error saving progress:", error);
@@ -271,14 +306,12 @@ const AspirantApplication = () => {
     }
   }, [location.state, loadPositions, user, isCheckingAuth]);
 
-  // Validation logic
+  // Validation logic - Updated to check upload status instead of File object
   const validateStep = (step: number): boolean => {
     const errors: Record<string, string> = {};
     
     switch (step) {
-      // ... (Step 1-5 validation logic is kept the same)
       case 1:
-        if (!applicationData.photo) errors.photo = "Photo is required";
         if (!applicationData.full_name.trim()) errors.full_name = "Full name is required";
         try {
           matricSchema.parse(applicationData.matric);
@@ -308,12 +341,12 @@ const AspirantApplication = () => {
             }
         }
         const wordCount = applicationData.why_running.trim().split(/\s+/).length;
-        if (wordCount < 20 || wordCount > 1000) {
-          errors.why_running = "Why running must be between 20-1000 words";
+        if (wordCount < 10 || wordCount > 1000) {
+          errors.why_running = "Why running must be between 10-1000 words";
         }
-      break;
-    }
-       case 3: {
+        break;
+      }
+      case 3: {
         try {
           const cgpa = parseFloat(applicationData.cgpa);
           cgpaSchema.parse(cgpa);
@@ -325,7 +358,6 @@ const AspirantApplication = () => {
         }
         break;
       }
-         
       case 4: {
         const leadershipWords = applicationData.leadership_history.trim().split(/\s+/).length;
         if (leadershipWords < 20) {
@@ -333,12 +365,11 @@ const AspirantApplication = () => {
         }
         break;
       }
-        
       case 5:
-        if (!applicationData.payment_proof) errors.payment_proof = "Payment proof is required";
+        
         break;
       
-      case 6: // Step 6 doesn't have internal validation fields, only the external confirmation state
+      case 6:
       default:
         break;
     }
@@ -350,17 +381,24 @@ const AspirantApplication = () => {
   const handleNext = async () => {
     if (validateStep(currentStep)) {
       await saveProgress(currentStep);
-      setCurrentStep(prev => Math.min(prev + 1, TOTAL_STEPS));
+      if (currentStep < TOTAL_STEPS) {
+        setCurrentStep(prev => prev + 1);
+      }
+    } else {
+      toast({
+        title: "Validation Error",
+        description: "Please fill all the fields correctly before proceeding.",
+        variant: "destructive",
+      });
     }
   };
 
   const handlePrevious = () => {
     setCurrentStep(prev => Math.max(prev - 1, 1));
-    setIsConfirmed(false); // Reset confirmation on back
+    setIsConfirmed(false);
   };
 
   const handleFileUpload = (field: keyof ApplicationData, file: File | null) => {
-    // ... (File upload logic is kept the same for brevity)
     if (file) {
       const maxSize = field === 'photo' ? 1 * 1024 * 1024 : 2 * 1024 * 1024;
       if (file.size > maxSize) {
@@ -384,13 +422,53 @@ const AspirantApplication = () => {
         });
         return;
       }
+
+      // Create preview URL and store both file and upload status
+      const previewUrl = URL.createObjectURL(file);
+      if (field === 'photo') {
+        setApplicationData(prev => ({ 
+          ...prev, 
+          photo: file, 
+          photoPreviewUrl: previewUrl,
+          photoUploaded: true // Mark as uploaded
+        }));
+        toast({
+          title: "Photo Uploaded",
+          description: "Profile photo has been uploaded successfully.",
+        });
+      } else if (field === 'payment_proof') {
+        setApplicationData(prev => ({ 
+          ...prev, 
+          payment_proof: file, 
+          paymentProofPreviewUrl: previewUrl,
+          paymentProofUploaded: true // Mark as uploaded
+        }));
+        toast({
+          title: "Payment Proof Uploaded",
+          description: "Payment proof has been uploaded successfully.",
+        });
+      }
+    } else {
+      // Clear file and upload status
+      if (field === 'photo') {
+        setApplicationData(prev => ({ 
+          ...prev, 
+          photo: null, 
+          photoPreviewUrl: null,
+          photoUploaded: false
+        }));
+      } else if (field === 'payment_proof') {
+        setApplicationData(prev => ({ 
+          ...prev, 
+          payment_proof: null, 
+          paymentProofPreviewUrl: null,
+          paymentProofUploaded: false
+        }));
+      }
     }
-    
-    setApplicationData(prev => ({ ...prev, [field]: file }));
   };
 
   const handleSubmitApplication = async () => {
-    // Final check only needs the confirmation state, as Step 5 validation already ran via handleNext
     if (currentStep !== TOTAL_STEPS || !isConfirmed) {
         toast({
             title: "Action Required",
@@ -400,7 +478,19 @@ const AspirantApplication = () => {
         return;
     }
     
-    if (!user) { /* ... auth check ... */ return; }
+    // Final validation - ensure files are actually present for submission
+    if (!applicationData.photo) {
+      toast({
+        title: "Missing Photo",
+        description: "Please re-upload your profile photo before submitting.",
+        variant: "destructive",
+      });
+      setCurrentStep(5);
+      return;
+    }
+    
+    
+    if (!user) return;
     
     setIsSubmitting(true);
     
@@ -409,9 +499,8 @@ const AspirantApplication = () => {
           .from("aspirants")
           .select("id")
           .eq("user_id", user.id)
-          .maybeSingle(); // Use maybeSingle to get null if no row is found
+          .maybeSingle();
           
-        // If an application is found, stop the submission
         if (existingApplication) {
             setIsSubmitting(false);
             toast({
@@ -422,11 +511,10 @@ const AspirantApplication = () => {
             return; 
         }
         
-        // If there was an error fetching (and it's not the expected "no row found" error), throw it
         if (fetchError && fetchError.code !== 'PGRST116') { 
              throw fetchError;
         }
-      // ... (File upload and Supabase insertion logic is kept the same for brevity)
+      
       const uploadedUrls: Record<string, string> = {};
       
       if (applicationData.photo) {
@@ -509,545 +597,14 @@ const AspirantApplication = () => {
       setIsSubmitting(false);
     }
   };
+  
 
-  const printContestantForm = () => {
-    const printContent = `
-        <!DOCTYPE html>
-<html>
-<head>
-<title>NUNSA REFEREE FORM</title>
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 40px;
-        font-size: 14px;
-        background: #f9f9f9;
-    }
 
-    .document {
-        background: white;
-        padding: 30px 40px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        max-width: 900px;
-        margin: auto;
-    }
-
-    /* HEADER */
-    .header {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 10px;
-    }
-
-    .logo {
-        width: 70px;
-        height: 70px;
-        object-fit: contain;
-        border-radius: 50%;
-        border: 1px solid #ccc;
-        padding: 3px;
-    }
-
-    .header-text h1 {
-        font-size: 22px;
-        margin: 0;
-        font-weight: bold;
-        text-transform: uppercase;
-    }
-
-    .header-text p {
-        font-size: 12px;
-        margin: 0;
-        color: #555;
-        letter-spacing: 0.3px;
-    }
-
-    /* FORM TITLE */
-    .title {
-        text-align: center;
-        margin: 25px 0;
-        font-size: 20px;
-        font-weight: bold;
-        text-decoration: underline;
-    }
-
-    /* SECTIONS */
-    h2 {
-        font-size: 15px;
-        margin-bottom: 8px;
-        padding-bottom: 4px;
-        border-bottom: 1px solid #222;
-    }
-
-    .section {
-        margin-bottom: 25px;
-    }
-
-    /* FIELDS */
-    .field {
-        margin-bottom: 10px;
-        display: flex;
-        align-items: baseline;
-    }
-
-    .label {
-        font-weight: bold;
-        min-width: 180px;
-    }
-
-    .underline {
-        flex-grow: 1;
-        border-bottom: 1px solid #000;
-        min-height: 18px;
-        padding-left: 4px;
-    }
-
-    .inline-group {
-        display: flex;
-        gap: 20px;
-    }
-
-    /* REFEREE BOX */
-    .referee-area {
-        border: 1px solid #aaa;
-        padding: 15px;
-        border-radius: 4px;
-        background: #fafafa;
-    }
-
-    .referee-comment {
-        border: 1px dashed #aaa;
-        min-height: 80px;
-        margin-top: 5px;
-        padding: 8px;
-        background: #fff;
-    }
-
-    .note {
-        font-size: 12px;
-        margin-top: 10px;
-        font-style: italic;
-        color: #444;
-    }
-
-</style>
-</head>
-
-<body>
-<div class="document">
-
-    <div class="header">
-        <img src="${NUNSALogo}" alt="NUNSA Logo" class="logo" />
-        <div class="header-text">
-            <h1>NUNSA IELCOM</h1>
-            <p>Al-Hikmah University Chapter</p>
-        </div>
-    </div>
-
-    <div class="title">NUNSA REFEREE FORM</div>
-
-    <div class="section">
-        <h2>1. PERSONAL INFORMATION</h2>
-
-        <div class="field">
-            <span class="label">Full Name:</span>
-            <span class="underline">${applicationData.full_name || ""}</span>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Matric Number:</span>
-                <span class="underline">${applicationData.matric || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Department:</span>
-                <span class="underline">${applicationData.department || ""}</span>
-            </div>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Level of Study:</span>
-                <span class="underline">${applicationData.level || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Date of Birth:</span>
-                <span class="underline">${applicationData.dob || ""}</span>
-            </div>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Gender:</span>
-                <span class="underline">${applicationData.gender || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Phone Number:</span>
-                <span class="underline">${applicationData.phone || ""}</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>2. POSITION CONTESTING FOR</h2>
-        <div class="field">
-            <span class="label">Desired Position:</span>
-            <span class="underline">${selectedPosition?.name || ""}</span>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>3. REFEREE</h2>
-        <div class="referee-area">
-
-            <div class="inline-group">
-                <div class="field" style="width: 50%;">
-                    <span class="label">Name:</span>
-                    <span class="underline"></span>
-                </div>
-
-                <div class="field" style="width: 50%;">
-                    <span class="label">Phone:</span>
-                    <span class="underline"></span>
-                </div>
-            </div>
-
-            <div class="inline-group">
-                <div class="field" style="width: 50%;">
-                    <span class="label">Signature:</span>
-                    <span class="underline"></span>
-                </div>
-
-                <div class="field" style="width: 50%;">
-                    <span class="label">Date:</span>
-                    <span class="underline"></span>
-                </div>
-            </div>
-
-            <div class="field" style="flex-direction: column;">
-                <span class="label" style="min-width: unset;">Referee Comments:</span>
-                <div class="referee-comment"></div>
-            </div>
-
-            <p class="note">
-                Note: A referee must be an Academic staff in the Faculty of Nursing Science,
-                College of Health Sciences, Al-Hikmah University, Ilorin.
-            </p>
-
-        </div>
-    </div>
-
-</div>
-</body>
-</html>
-    `;
-
-    // Create a hidden iframe, write content, and print
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-        doc.open();
-        doc.write(printContent);
-        doc.close();
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-    }
-
-    // Clean up the iframe after a short delay
-    setTimeout(() => {
-        document.body.removeChild(iframe);
-    }, 100);
-
-    toast({
-      title: "Printing Form",
-      description: "NUNSA Contestant Form is generated and ready for printing.",
-    });
-  };
-const generateRefereeFormContent = (applicantName: string): string => {
-    return `
-        <!DOCTYPE html>
-        <html>
-<head>
-<title>NUNSA REFEREE FORM</title>
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 40px;
-        font-size: 14px;
-        background: #f9f9f9;
-    }
-
-    .document {
-        background: white;
-        padding: 30px 40px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        max-width: 900px;
-        margin: auto;
-    }
-
-    /* HEADER */
-    .header {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 10px;
-    }
-
-    .logo {
-        width: 70px;
-        height: 70px;
-        object-fit: contain;
-        border-radius: 50%;
-        border: 1px solid #ccc;
-        padding: 3px;
-    }
-
-    .header-text h1 {
-        font-size: 22px;
-        margin: 0;
-        font-weight: bold;
-        text-transform: uppercase;
-    }
-
-    .header-text p {
-        font-size: 12px;
-        margin: 0;
-        color: #555;
-        letter-spacing: 0.3px;
-    }
-
-    /* FORM TITLE */
-    .title {
-        text-align: center;
-        margin: 25px 0;
-        font-size: 20px;
-        font-weight: bold;
-        text-decoration: underline;
-    }
-
-    /* SECTIONS */
-    h2 {
-        font-size: 15px;
-        margin-bottom: 8px;
-        padding-bottom: 4px;
-        border-bottom: 1px solid #222;
-    }
-
-    .section {
-        margin-bottom: 25px;
-    }
-
-    /* FIELDS */
-    .field {
-        margin-bottom: 10px;
-        display: flex;
-        align-items: baseline;
-    }
-
-    .label {
-        font-weight: bold;
-        min-width: 180px;
-    }
-
-    .underline {
-        flex-grow: 1;
-        border-bottom: 1px solid #000;
-        min-height: 18px;
-        padding-left: 4px;
-    }
-
-    .inline-group {
-        display: flex;
-        gap: 20px;
-    }
-
-    /* REFEREE BOX */
-    .referee-area {
-        border: 1px solid #aaa;
-        padding: 15px;
-        border-radius: 4px;
-        background: #fafafa;
-    }
-
-    .referee-comment {
-        border: 1px dashed #aaa;
-        min-height: 80px;
-        margin-top: 5px;
-        padding: 8px;
-        background: #fff;
-    }
-
-    .note {
-        font-size: 12px;
-        margin-top: 10px;
-        font-style: italic;
-        color: #444;
-    }
-
-</style>
-</head>
-
-<body>
-<div class="document">
-
-    <div class="header">
-        <img src="${NUNSALogo}" alt="NUNSA Logo" class="logo" />
-        <div class="header-text">
-            <h1>NUNSA IELCOM</h1>
-            <p>Al-Hikmah University Chapter</p>
-        </div>
-    </div>
-
-    <div class="title">NUNSA REFEREE FORM</div>
-
-    <div class="section">
-        <h2>1. PERSONAL INFORMATION</h2>
-
-        <div class="field">
-            <span class="label">Full Name:</span>
-            <span class="underline">${applicationData.full_name || ""}</span>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Matric Number:</span>
-                <span class="underline">${applicationData.matric || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Department:</span>
-                <span class="underline">${applicationData.department || ""}</span>
-            </div>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Level of Study:</span>
-                <span class="underline">${applicationData.level || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Date of Birth:</span>
-                <span class="underline">${applicationData.dob || ""}</span>
-            </div>
-        </div>
-
-        <div class="inline-group">
-            <div class="field" style="width: 50%;">
-                <span class="label">Gender:</span>
-                <span class="underline">${applicationData.gender || ""}</span>
-            </div>
-
-            <div class="field" style="width: 50%;">
-                <span class="label">Phone Number:</span>
-                <span class="underline">${applicationData.phone || ""}</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>2. POSITION CONTESTING FOR</h2>
-        <div class="field">
-            <span class="label">Desired Position:</span>
-            <span class="underline">${selectedPosition?.name || ""}</span>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2>3. REFEREE</h2>
-        <div class="referee-area">
-
-            <div class="inline-group">
-                <div class="field" style="width: 50%;">
-                    <span class="label">Name:</span>
-                    <span class="underline"></span>
-                </div>
-
-                <div class="field" style="width: 50%;">
-                    <span class="label">Phone:</span>
-                    <span class="underline"></span>
-                </div>
-            </div>
-
-            <div class="inline-group">
-                <div class="field" style="width: 50%;">
-                    <span class="label">Signature:</span>
-                    <span class="underline"></span>
-                </div>
-
-                <div class="field" style="width: 50%;">
-                    <span class="label">Date:</span>
-                    <span class="underline"></span>
-                </div>
-            </div>
-
-            <div class="field" style="flex-direction: column;">
-                <span class="label" style="min-width: unset;">Referee Comments:</span>
-                <div class="referee-comment"></div>
-            </div>
-
-            <p class="note">
-                Note: A referee must be an Academic staff in the Faculty of Nursing Science,
-                College of Health Sciences, Al-Hikmah University, Ilorin.
-            </p>
-
-        </div>
-    </div>
-
-</div>
-</body>
-</html>
-    `;
-  }
-
-  /**
-   * Handles the download of the Referee Form as an HTML file.
-   */
-  const downloadRefereeFormAsPdf = () => {
-    const printContent = generateRefereeFormContent(applicationData.full_name);
-
-    // Create a hidden iframe, write content, and print
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-        doc.open();
-        doc.write(printContent);
-        doc.close();
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-    }
-
-    // Clean up the iframe after a short delay
-    setTimeout(() => {
-        document.body.removeChild(iframe);
-    }, 100);
-
-    toast({
-      title: "PDF Generation Triggered",
-      description: "Please select 'Save as PDF' from your browser's print dialog to download the Referee Form.",
-    });
+   const handleDownload = () => {
+    window.open('/ielcomform.pdf', '_blank');
   };
 
-  const downloadForm = downloadRefereeFormAsPdf;
-
+  
   const openWhatsApp = () => {
     window.open("https://wa.me/2347040640646", "_blank");
   };
@@ -1066,9 +623,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
 
   const progress = (currentStep / TOTAL_STEPS) * 100;
 
-  // --- Render logic for loading and auth checks is kept the same ---
   if (isCheckingAuth || isLoading || !user) {
-    // This block handles all initial loading states (Auth/Data)
     const isAuthError = !isCheckingAuth && !user;
     return (
       <div className="min-h-screen bg-background">
@@ -1100,7 +655,6 @@ const generateRefereeFormContent = (applicantName: string): string => {
       </div>
     );
   }
-  // --- End Render logic for loading and auth checks ---
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -1125,7 +679,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
             </div>
           </div>
 
-          {/* Progress Bar (Enhanced) */}
+          {/* Progress Bar */}
           <Card className="p-4 sm:p-6 mb-6 sm:mb-8 shadow-lg border-l-4 border-primary">
             <div className="space-y-2">
               <div className="flex justify-between text-sm font-medium">
@@ -1158,38 +712,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Personal Information</h2>
                 
-                {/* Image Upload and Preview */}
-                <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4 p-4 border rounded-lg bg-muted/10">
-                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-primary/30 flex-shrink-0 bg-muted flex items-center justify-center shadow-inner">
-                    {applicationData.photo ? (
-                      <img 
-                        src={URL.createObjectURL(applicationData.photo)} 
-                        alt="Profile Preview" 
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-12 h-12 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="space-y-2 flex-grow w-full">
-                    <Label htmlFor="photo" className="flex items-center gap-1">
-                      <Upload className="w-4 h-4"/> Profile Photo *
-                    </Label>
-                    <Input
-                      id="photo"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      onChange={(e) => handleFileUpload('photo', e.target.files?.[0] || null)}
-                      className="cursor-pointer"
-                    />
-                    {validationErrors.photo && <p className="text-sm text-destructive">{validationErrors.photo}</p>}
-                    <p className="text-xs text-muted-foreground">JPG/PNG only, max 1MB. Must be clear headshot.</p>
-                  </div>
-                </div>
-
-                {/* Other fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Full Name, Matric, Dept, Level, DOB, Gender, Phone, Email fields... (kept the same) */}
                   <div className="space-y-2">
                     <Label htmlFor="full_name">Full Name *</Label>
                     <Input
@@ -1279,7 +802,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </div>
             )}
 
-            {/* Step 2: Position & Motivation (kept the same for brevity, assuming original logic is sound) */}
+            {/* Step 2: Position & Motivation */}
             {currentStep === 2 && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Position & Motivation</h2>
@@ -1320,7 +843,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
                     <p className="text-sm text-muted-foreground mb-2">{selectedPosition.description}</p>
                     <div className="flex flex-wrap gap-2 text-sm">
                       <Badge variant="outline">
-                          Levels: {selectedPosition.eligible_levels.map(l => `${l}L`).join(', ')}
+                          Levels: {selectedPosition.eligible_levels.map(l => `${l}`).join(', ')}
                       </Badge>
                       <Badge variant="outline">Fee: ₦{selectedPosition.application_fee.toLocaleString()}</Badge>
                     </div>
@@ -1346,7 +869,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </div>
             )}
             
-            {/* Step 3: Academic Information (kept the same for brevity) */}
+            {/* Step 3: Academic Information */}
             {currentStep === 3 && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Academic Information</h2>
@@ -1399,7 +922,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </div>
             )}
 
-            {/* Step 4: Leadership Experience (kept the same for brevity) */}
+            {/* Step 4: Leadership Experience */}
             {currentStep === 4 && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Leadership Experience</h2>
@@ -1428,19 +951,19 @@ const generateRefereeFormContent = (applicantName: string): string => {
                       <p className="font-medium text-amber-900 dark:text-amber-300 mb-1">Required Documents for Screening Day:</p>
                       <ul className="text-amber-800 dark:text-amber-400 space-y-1">
                         <li>• Referee form completed and signed by academic staff</li>
+                        <li>• Contact Nunsa Cafe for a copy of Referee Form if download fail</li>
                         <li>• Results of Last Academic Semester showing Current CGPA</li>
                         <li>• Certifactes of Leadership or documents proof of leadership experience</li>
                       </ul>
                       <div className="mt-3 space-y-2">
                         <div className="flex flex-wrap gap-2">
-                          <Button variant="outline" size="sm" onClick={downloadForm} className="gap-2">
-                            <Download className="w-4 h-4" />
-                            Download Referee Form
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={printContestantForm} className="gap-2">
-                            <Printer className="w-4 h-4" />
-                            Print Contestant Form
-                          </Button>
+                           <button
+                                          onClick={handleDownload}
+                                          className="flex items-center justify-center space-x-2 bg-background border-2 border-primary text-primary hover:bg-primary hover:text-primary-foreground px-6 py-3 rounded-2xl font-semibold transition-colors h-12"
+                                        >
+                                          <Download className="h-5 w-5" />
+                                          <span>Download Referee Form</span>
+                                        </button>
                           <Button variant="outline" size="sm" onClick={openWhatsApp} className="gap-2">
                             <MessageCircle className="w-4 h-4" />
                             Contact NUNSA Café
@@ -1453,12 +976,48 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </div>
             )}
 
-            {/* Step 5: Payment Proof (kept the same for brevity) */}
+            {/* Step 5: Payment Proof */}
             {currentStep === 5 && (
               <div className="space-y-4 sm:space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Payment Proof</h2>
-                
-                {selectedPosition && (
+                  <Card className="p-4 bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-700">
+                    <h3 className="font-semibold text-green-900 dark:text-green-300 mb-2">Payment Instructions</h3>
+                    <div className="text-sm text-green-800 dark:text-green-400 space-y-1">
+                     
+                      <p><strong>Account Number:</strong> 9129196214 </p>
+                      <p><strong>Bank:</strong> MONIEPOINT </p>
+                      <p><strong>Account Name:</strong> Musa Zulaihat Dalhatu </p>
+                    </div>
+                  </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="payment_proof" className="flex items-center gap-1">
+                    Upload Payment Proof *
+                    {applicationData.paymentProofUploaded && (
+                      <CheckCircle2 className="w-4 h-4 text-green-600 ml-2" />
+                    )}
+                  </Label>
+                  <Input
+                    id="payment_proof"
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => handleFileUpload('payment_proof', e.target.files?.[0] || null)}
+                    className="cursor-pointer"
+                  />
+                  {validationErrors.payment_proof && <p className="text-sm text-destructive">{validationErrors.payment_proof}</p>}
+                  
+                  {/* Show file preview if available */}
+                  {(applicationData.payment_proof || applicationData.paymentProofUploaded) && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-700">
+                        ✓ File uploaded: {applicationData.payment_proof?.name || "Previously uploaded file"}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {applicationData.paymentProofUploaded && !applicationData.payment_proof && (
+                    <p className="text-sm text-amber-600">⚠️ Payment proof was uploaded previously. Re-upload for final submission.</p>
+                  )}
+                  {selectedPosition && (
                   <Card className="p-4 bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-700">
                     <h3 className="font-semibold text-green-900 dark:text-green-300 mb-2">Payment Instructions</h3>
                     <div className="text-sm text-green-800 dark:text-green-400 space-y-1">
@@ -1469,21 +1028,42 @@ const generateRefereeFormContent = (applicantName: string): string => {
                     </div>
                   </Card>
                 )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="payment_proof">Upload Payment Proof *</Label>
-                  <Input
-                    id="payment_proof"
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleFileUpload('payment_proof', e.target.files?.[0] || null)}
-                    className="cursor-pointer"
-                  />
-                  {validationErrors.payment_proof && <p className="text-sm text-destructive">{validationErrors.payment_proof}</p>}
-                 
                 </div>
+                <div className="flex items-center gap-4 my-6">
+      <div className="flex-1 h-px bg-border"></div>
+      <span className="text-muted-foreground font-medium">OR</span>
+      <div className="flex-1 h-px bg-border"></div>
+    </div>
 
-                <Card className="p-4 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700">
+    {/* Option 2: Send via WhatsApp */}
+    <div className="space-y-4">
+      <Label className="text-lg font-semibold">
+        Option 2: Send Proof to IELCOM Treasurer on WhatsApp
+      </Label>
+      <Card className="p-5 bg-blue-50 border border-blue-300">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-left">
+            <p className="font-medium">Treasurer Contact:</p>
+            <p className="text-2xl font-bold text-primary">0912 919 6214</p>
+            <p className="text-sm text-muted-foreground mt-1">Click button → Attach proof → Send</p>
+          </div>
+          <Button
+            size="lg"
+            className="bg-green-600 hover:bg-green-700 text-white font-bold"
+            onClick={() => {
+              const positionName = selectedPosition?.name || "Aspirant Position";
+              const message = `Attached is my proof of payment for the position of *${positionName}*.\n\nMatric No: *${applicationData.matric || "N/A"}*\nFull Name: *${applicationData.full_name || "N/A"}*`;
+              const whatsappUrl = `https://wa.me/2349129196214?text=${encodeURIComponent(message)}`;
+              window.open(whatsappUrl, "_blank");
+            }}
+          >
+            <MessageCircle className="w-5 h-5 mr-2" />
+            Send Proof on WhatsApp
+          </Button>
+        </div>
+      </Card>
+    </div>
+    <Card className="p-4 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700">
                   <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
@@ -1497,10 +1077,52 @@ const generateRefereeFormContent = (applicantName: string): string => {
                     </div>
                   </div>
                 </Card>
+                 {/* Image Upload and Preview */}
+                <div className="flex flex-col items-center sm:flex-row sm:items-start gap-4 p-4 border rounded-lg bg-muted/10">
+                  <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 border-primary/30 flex-shrink-0 bg-muted flex items-center justify-center shadow-inner">
+                    {applicationData.photo ? (
+                      <img 
+                        src={URL.createObjectURL(applicationData.photo)} 
+                        alt="Profile Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : applicationData.photoPreviewUrl ? (
+                      <img 
+                        src={applicationData.photoPreviewUrl} 
+                        alt="Profile Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-12 h-12 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="space-y-2 flex-grow w-full">
+                    <Label htmlFor="photo" className="flex items-center gap-1">
+                      <Upload className="w-4 h-4"/> Profile Photo *
+                      {applicationData.photoUploaded && (
+                        <CheckCircle2 className="w-4 h-4 text-green-600 ml-2" />
+                      )}
+                    </Label>
+                    <Input
+                      id="photo"
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      onChange={(e) => handleFileUpload('photo', e.target.files?.[0] || null)}
+                      className="cursor-pointer"
+                    />
+                    {validationErrors.photo && <p className="text-sm text-destructive">{validationErrors.photo}</p>}
+                    {applicationData.photoUploaded && !applicationData.photo && (
+                      <p className="text-sm text-amber-600">⚠️ Photo was uploaded previously. Re-upload for final submission.</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">JPG/PNG only, max 1MB. Must be clear headshot.</p>
+                  </div>
+                </div>
+
+                
               </div>
             )}
 
-            {/* Step 6: Review & Final Confirmation (NEW) */}
+            {/* Step 6: Review & Final Confirmation */}
             {currentStep === 6 && (
               <div className="space-y-6">
                 <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 flex items-center gap-2">
@@ -1518,6 +1140,8 @@ const generateRefereeFormContent = (applicantName: string): string => {
                         <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-primary/50 flex-shrink-0 bg-muted flex items-center justify-center shadow-md">
                           {applicationData.photo ? (
                             <img src={URL.createObjectURL(applicationData.photo)} alt="Profile Preview" className="w-full h-full object-cover" />
+                          ) : applicationData.photoPreviewUrl ? (
+                            <img src={applicationData.photoPreviewUrl} alt="Profile Preview" className="w-full h-full object-cover" />
                           ) : <User className="w-10 h-10 text-muted-foreground" />}
                         </div>
                         <span className="text-sm font-semibold mt-2">{applicationData.full_name || 'N/A'}</span>
@@ -1558,15 +1182,15 @@ const generateRefereeFormContent = (applicantName: string): string => {
                               </div>
                         </ReviewSection>
                         <ReviewSection title="5. Payment Proof">
-                            <ReviewItem label="Payment Proof" value={applicationData.payment_proof?.name} isFile={true} />
+                            <ReviewItem label="Payment Proof" value={applicationData.payment_proof?.name || (applicationData.paymentProofUploaded ? "Previously uploaded" : null)} isFile={true} />
                             <p className="text-xs text-muted-foreground italic mt-2">
-                                File: {applicationData.payment_proof?.name || 'No file selected'}
+                                File: {applicationData.payment_proof?.name || (applicationData.paymentProofUploaded ? "Previously uploaded file" : 'No file selected')}
                             </p>
                         </ReviewSection>
                     </div>
                 </div>
 
-                {/* Final Declaration Card (NEW CONTENT) */}
+                {/* Final Declaration Card */}
                 <Card className="p-4 sm:p-6 border-2 border-red-500/50 bg-red-50/50 dark:bg-red-900/10 shadow-xl">
                   <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-red-600 dark:text-red-400">
                     <Lock className="w-5 h-5"/>DECLARATION & AGREEMENT
@@ -1585,7 +1209,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
                       <p className="font-semibold text-base mb-2 text-yellow-800 dark:text-yellow-400">RULES AND REQUIREMENTS CHECK:</p>
                       <ul className="list-disc pl-5 space-y-1 text-yellow-700 dark:text-yellow-300">
                         <li>All Contestants must be bona-fide students of Al-Hikmah University Nursing Department.</li> 
-                        <li>All contestants found guilty of examinations malpractice or any act of indecency with concrete evidence aren’t eligible to contest.</li> 
+                        <li>All contestants found guilty of examinations malpractice or any act of indecency with concrete evidence aren't eligible to contest.</li> 
                         <li>Attach a copy of the payment receipt for the Association Fee for 2025/2026 Academic Session.</li> 
                         <li>Attach proof of academic standing. (Copy of Academic Transcript/Result Slip)</li> 
                         <li>Attach a copy of the payment receipt for the nomination form.</li> 
@@ -1622,8 +1246,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </div>
             )}
 
-
-            {/* Navigation Buttons (Mobile Responsive) */}
+            {/* Navigation Buttons */}
             <div className="flex flex-col-reverse sm:flex-row justify-between gap-4 pt-6 sm:pt-8 border-t mt-6">
               <Button
                 variant="outline"
@@ -1636,7 +1259,7 @@ const generateRefereeFormContent = (applicantName: string): string => {
               </Button>
 
               <div className="flex gap-2 w-full sm:w-auto justify-end">
-                {currentStep < TOTAL_STEPS - 1 && ( // Only show Save until step 5
+                {currentStep < TOTAL_STEPS - 1 && (
                     <Button
                       variant="outline"
                       onClick={() => saveProgress(currentStep)}
@@ -1651,7 +1274,6 @@ const generateRefereeFormContent = (applicantName: string): string => {
                       Save
                     </Button>
                 )}
-                
 
                 {currentStep < TOTAL_STEPS ? (
                   <Button onClick={handleNext} className="gap-2 bg-primary hover:bg-primary/90 w-full sm:w-auto">
@@ -1675,7 +1297,6 @@ const generateRefereeFormContent = (applicantName: string): string => {
                         Submit Application
                       </>
                     )}
-                    
                   </Button>
                 )}
               </div>
@@ -1695,4 +1316,4 @@ const generateRefereeFormContent = (applicantName: string): string => {
   );
 };
 
-export default AspirantApplication;
+export default AspirantApplication;                                            
