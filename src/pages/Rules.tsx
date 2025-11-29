@@ -193,7 +193,7 @@ function RulesPage() {
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
           <li>Voting is conducted electronically via the official platform.</li>
-          <li>**Secret ballot system ensures privacy and anonymity.</li>
+          <li>Secret ballot system ensures privacy and anonymity.</li>
           <li>The official Voting Period will be announced publicly.</li>
           <li>No proxy voting allowed.</li>
           <li>A vote, once submitted, cannot be changed.</li>
@@ -212,7 +212,7 @@ function RulesPage() {
           <li>Unauthorized access to voting systems or data is illegal.</li>
           <li>Impersonation of another voter is grounds for immediate disqualification.</li>
           <li>Disruption of the electoral process in any manner.</li>
-          <li>Violations may result in Disciplinary actions, sanctions, or Disqualification**.</li>
+          <li>Violations may result in Disciplinary actions, sanctions, or Disqualification.</li>
         </ul>
       ),
     },
@@ -223,7 +223,7 @@ function RulesPage() {
       content: (
         <ul className="list-disc list-inside space-y-2 pl-4">
           <li>Sales of Form period: 15th to 30th November, 2025.</li>
-          <li>Handing-Over to Care-Taker Committee/Pre-Induction: 27th November, 2025.</li>
+          <li>Handing-Over to Care-Taker Committee/Pre-Induction: 26th November, 2025.</li>
           <li>Screening: 8th of November, 2025 (Please note potential conflict with form sales deadline).</li>
           <li>Campaign period: Starts after Purchase of form by Aspirants.</li>
           <li>Campaign period Ends: 24 hours before voting.</li>

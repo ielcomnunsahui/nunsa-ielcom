@@ -23,9 +23,19 @@ html {
   input[type="password"],
   input[type="search"],
   input[type="number"],
+  input[type="file"],
   textarea,
   select {
     font-size: 16px !important; /* Crucial for iOS */
+  }
+  
+  /* Ensure file inputs are properly styled on mobile */
+  input[type="file"] {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+    width: 100%;
   }
 }
 
@@ -73,4 +83,150 @@ body.modal-open {
   position: sticky;
   top: 0;
   z-index: 100;
+}
+
+/* ================================================================== */
+/* 4. MOBILE-SPECIFIC FIXES FOR ASPIRANT APPLICATION                  */
+/* ================================================================== */
+
+/* Ensure proper file upload button styling on mobile */
+@media screen and (max-width: 768px) {
+  .file-upload-container {
+    width: 100%;
+  }
+  
+  .file-upload-container input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    background: #f9f9f9;
+    cursor: pointer;
+  }
+  
+  .file-upload-container input[type="file"]:focus {
+    outline: 2px solid #007bff;
+    border-color: #007bff;
+  }
+}
+
+/* Fix for step navigation on mobile */
+@media screen and (max-width: 640px) {
+  .step-navigation {
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+  
+  .step-navigation .button-group {
+    width: 100%;
+    justify-content: stretch;
+  }
+  
+  .step-navigation button {
+    flex: 1;
+    min-height: 44px; /* Minimum touch target size */
+  }
+}
+
+/* Improve form field spacing on mobile */
+@media screen and (max-width: 768px) {
+  .form-field {
+    margin-bottom: 16px;
+  }
+  
+  .form-field label {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+    display: block;
+  }
+  
+  .form-field input,
+  .form-field select,
+  .form-field textarea {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+}
+
+/* Print-specific styles for referee form */
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  
+  .referee-form {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .referee-form .header {
+    border-bottom: 2px solid #000;
+    margin-bottom: 20px;
+  }
+  
+  .referee-form .field {
+    margin-bottom: 10px;
+  }
+  
+  .referee-form .underline {
+    border-bottom: 1px solid #000;
+    min-height: 20px;
+  }
+}
+
+/* Enhanced mobile responsiveness for cards and containers */
+@media screen and (max-width: 768px) {
+  .responsive-card {
+    margin: 8px;
+    padding: 16px;
+    border-radius: 8px;
+  }
+  
+  .responsive-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .mobile-full-width {
+    width: 100% !important;
+  }
+}
+
+/* Fix for image preview on mobile */
+@media screen and (max-width: 768px) {
+  .image-preview-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .image-preview {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #007bff;
+  }
+  
+  .image-upload-area {
+    width: 100%;
+    text-align: center;
+  }
 }
