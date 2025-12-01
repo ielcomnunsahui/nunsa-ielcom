@@ -84,7 +84,7 @@ export const useActiveStage = () => {
                 // Fetch active stages (assuming 'election_stages' table)
                 // We order by start_time to prioritize the earliest/current stage if multiple are somehow active
                 const { data: stagesData } = await supabase
-                    .from("election_stages")
+                    .from("election_timeline")
                     .select("*")
                     .eq("is_active", true)
                     .order("start_time", { ascending: true });

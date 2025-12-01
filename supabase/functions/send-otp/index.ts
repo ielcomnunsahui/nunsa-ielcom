@@ -74,7 +74,7 @@ serve(async (req) => {
 
     // 4. Send OTP email using Resend
     const emailResponse = await resend.emails.send({
-      from: `NUNSA Elections <no-reply@nunsahui.xyz>`, // your domain
+      from: `NUNSA Elections <no-reply@huinunsa.xyz>`, // your domain
       to: email,
       subject: "Your NUNSA Election Verification Code",
       html: `

@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator"; 
 
-// --- Type Definitions (Kept as is) ---
+// --- Type Definitions (FIXED: Added user_id) ---
 
 interface Position {
   id: string;
@@ -27,11 +27,13 @@ interface Position {
   display_order: number;
 }
 
+// CRITICAL FIX: Added 'user_id' to link aspirant data to the authenticated Supabase user
 interface Aspirant {
   id: string;
   full_name: string;
   matric: string;
   position_id: string;
+  user_id: string; // <-- NEW: Use for cross-device identification
   payment_verified: boolean;
   photo_url: string | null;
   admin_review_status: 'pending' | 'approved' | 'rejected' | 'conditional';
@@ -85,28 +87,65 @@ const AspirantDashboard = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // --- Data Fetching (Kept as is for brevity) ---
+  // --- Data Fetching (FIXED) ---
   const loadDashboardData = useCallback(async () => {
+    // Ensure loading state starts
+    setIsLoading(true); 
+
     try {
-        const matricNumber = localStorage.getItem("aspirantMatric");
-        if (matricNumber) {
-            const { data: existingAspirant } = await supabase
+        // 1. Get the authenticated user from the current session (Cross-device fix)
+        const { data: { user } } = await supabase.auth.getUser();
+
+        let existingAspirant: Aspirant | null = null;
+        
+        if (user) {
+            // ** CRITICAL FIX: Query the 'aspirants' table using the authenticated user's ID **
+            const { data: aspirantByUserId, error: aspirantError } = await supabase
                 .from("aspirants")
                 .select(`
                     id, full_name, matric, position_id, payment_verified, admin_review_status, 
                     admin_review_notes, screening_scheduled_at, screening_result, 
                     promoted_to_candidate, created_at, photo_url, conditional_acceptance, 
-                    conditional_reason, resubmission_deadline,
+                    conditional_reason, resubmission_deadline, user_id,
                     aspirant_positions (name)
                 `)
-                .eq("matric", matricNumber)
+                .eq("user_id", user.id) // <-- Using authenticated ID, which is cross-device persistent
                 .maybeSingle();
 
-            if (existingAspirant) {
-                setAspirant(existingAspirant as unknown as Aspirant);
+            if (aspirantError) throw aspirantError;
+            
+            // Bypass TS2589 (deep type instantiation) with 'as any'
+            existingAspirant = aspirantByUserId as any as Aspirant; 
+        } else {
+            // Optional: If no user object (not logged in via Supabase Auth), 
+            // fall back to checking local storage (old, unreliable method)
+            const matricNumber = localStorage.getItem("aspirantMatric");
+            if (matricNumber) {
+                 const { data: aspirantByMatric } = await supabase
+                    .from("aspirants")
+                    .select(`
+                        id, full_name, matric, position_id, payment_verified, admin_review_status, 
+                        admin_review_notes, screening_scheduled_at, screening_result, 
+                        promoted_to_candidate, created_at, photo_url, conditional_acceptance, 
+                        conditional_reason, resubmission_deadline, user_id,
+                        aspirant_positions (name)
+                    `)
+                    .eq("matric", matricNumber)
+                    .maybeSingle();
+                 existingAspirant = aspirantByMatric as any as Aspirant;
             }
         }
-
+        
+        if (existingAspirant) {
+            setAspirant(existingAspirant);
+            // Optionally, save the matric back to local storage for local consistency
+            localStorage.setItem("aspirantMatric", existingAspirant.matric);
+        } else {
+             // If no aspirant data found, ensure the state is clear
+             setAspirant(null);
+        }
+        
+        // --- Fetch Positions and Timeline (Original Logic) ---
         const { data: positionsData, error: positionsError } = await supabase
             .from("aspirant_positions")
             .select("*")
@@ -141,7 +180,8 @@ const AspirantDashboard = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [toast]);
+// CRITICAL FIX: Dependency array added back to fix TS2554
+}, [toast]);
   
   useEffect(() => {
     loadDashboardData();
@@ -336,48 +376,48 @@ const AspirantDashboard = () => {
           </div>
 
           {/* Application Countdown (Kept responsive) */}
-                            {applicationDeadline && (
-                              <Card className="p-6 mb-8 animate-fade-in">
-                                <div className="text-center">
-                                  <div className="flex items-center justify-center gap-2 mb-4">
-                                    <Timer className="w-6 h-6 text-primary" />
-                                    <h2 className="text-2xl font-bold text-foreground">
-                                      {isApplicationOpen ? "Application Deadline" : "Applications Closed"}
-                                    </h2>
-                                  </div>
-                                  
-                                  {timeRemaining && isApplicationOpen ? (
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-lg mx-auto">
-                                      {/* Added sm:grid-cols-4 for better mobile display of 2x2 grid on small screens */}
-                                      <div className="text-center p-4 bg-primary/10 rounded-lg">
-                                        <div className="text-2xl font-bold text-primary">{timeRemaining.days}</div>
-                                        <div className="text-sm text-muted-foreground">Days</div>
-                                      </div>
-                                      <div className="text-center p-4 bg-primary/10 rounded-lg">
-                                        <div className="text-2xl font-bold text-primary">{timeRemaining.hours}</div>
-                                        <div className="text-sm text-muted-foreground">Hours</div>
-                                      </div>
-                                      <div className="text-center p-4 bg-primary/10 rounded-lg">
-                                        <div className="text-2xl font-bold text-primary">{timeRemaining.minutes}</div>
-                                        <div className="text-sm text-muted-foreground">Minutes</div>
-                                      </div>
-                                      <div className="text-center p-4 bg-primary/10 rounded-lg">
-                                        <div className="text-2xl font-bold text-primary">{timeRemaining.seconds}</div>
-                                        <div className="text-sm text-muted-foreground">Seconds</div>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-center p-4 bg-destructive/10 rounded-lg max-w-lg mx-auto">
-                                      <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
-                                      <p className="text-destructive font-medium">Application period has ended</p>
-                                      <p className="text-sm text-muted-foreground mt-1">
-                                        Deadline was: {applicationDeadline.toLocaleDateString()} at {applicationDeadline.toLocaleTimeString()}
-                                      </p>
-                                    </div>
-                                  )}
+                          {applicationDeadline && (
+                            <Card className="p-6 mb-8 animate-fade-in">
+                              <div className="text-center">
+                                <div className="flex items-center justify-center gap-2 mb-4">
+                                  <Timer className="w-6 h-6 text-primary" />
+                                  <h2 className="text-2xl font-bold text-foreground">
+                                    {isApplicationOpen ? "Application Deadline" : "Applications Closed"}
+                                  </h2>
                                 </div>
-                              </Card>
-                            )}
+                                
+                                {timeRemaining && isApplicationOpen ? (
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-lg mx-auto">
+                                    {/* Added sm:grid-cols-4 for better mobile display of 2x2 grid on small screens */}
+                                    <div className="text-center p-4 bg-primary/10 rounded-lg">
+                                      <div className="text-2xl font-bold text-primary">{timeRemaining.days}</div>
+                                      <div className="text-sm text-muted-foreground">Days</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-primary/10 rounded-lg">
+                                      <div className="text-2xl font-bold text-primary">{timeRemaining.hours}</div>
+                                      <div className="text-sm text-muted-foreground">Hours</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-primary/10 rounded-lg">
+                                      <div className="text-2xl font-bold text-primary">{timeRemaining.minutes}</div>
+                                      <div className="text-sm text-muted-foreground">Minutes</div>
+                                    </div>
+                                    <div className="text-center p-4 bg-primary/10 rounded-lg">
+                                      <div className="text-2xl font-bold text-primary">{timeRemaining.seconds}</div>
+                                      <div className="text-sm text-muted-foreground">Seconds</div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-center p-4 bg-destructive/10 rounded-lg max-w-lg mx-auto">
+                                    <AlertCircle className="w-8 h-8 text-destructive mx-auto mb-2" />
+                                    <p className="text-destructive font-medium">Application period has ended</p>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      Deadline was: {applicationDeadline.toLocaleDateString()} at {applicationDeadline.toLocaleTimeString()}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </Card>
+                          )}
 
           {/* Application Status Dashboard (Restructured for Mobile) */}
           {aspirant && (
@@ -504,24 +544,24 @@ const AspirantDashboard = () => {
                 >
                     {/* Left Section: Title and Compact Details */}
                     <div className="flex-1 w-full sm:w-auto mb-3 sm:mb-0">
-                        <div className="flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-secondary" />
-                            <h3 className="text-lg font-bold text-foreground">{position.name}</h3>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 ml-7 line-clamp-1">{position.description}</p>
-                        
-                        {/* Compact Details for Mobile/List */}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mt-3 ml-7">
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                                <DollarSign className="w-3 h-3 text-primary"/> Fee: <span className="font-semibold text-primary">₦{position.application_fee.toLocaleString()}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                                <User className="w-3 h-3"/> CGPA: <span className="font-semibold">{position.min_cgpa.toFixed(2)}</span>
-                            </span>
-                            <span className="flex items-center gap-1 text-muted-foreground">
-                                <Calendar className="w-3 h-3"/> Levels: <span className="font-semibold">{position.eligible_levels.join(", ")}</span>
-                            </span>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-secondary" />
+                        <h3 className="text-lg font-bold text-foreground">{position.name}</h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 ml-7 line-clamp-1">{position.description}</p>
+                      
+                      {/* Compact Details for Mobile/List */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm mt-3 ml-7">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                              <DollarSign className="w-3 h-3 text-primary"/> Fee: <span className="font-semibold text-primary">₦{position.application_fee.toLocaleString()}</span>
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                              <User className="w-3 h-3"/> CGPA: <span className="font-semibold">{position.min_cgpa.toFixed(2)}</span>
+                          </span>
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                              <Calendar className="w-3 h-3"/> Levels: <span className="font-semibold">{position.eligible_levels.join(", ")}</span>
+                          </span>
+                      </div>
                     </div>
                     
                     {/* Right Section: Action Button */}
