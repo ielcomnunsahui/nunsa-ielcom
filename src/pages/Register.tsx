@@ -84,11 +84,11 @@ const Register = () => {
           // Fully registered and verified
           toast({
             title: "Already Registered",
-            description: "You are already registered and verified. Please login instead.",
+            description: "You are already registered and verified. Please wait for the elections or contact support if you believe this is an error.",
             variant: "destructive",
           });
           setIsLoading(false);
-          navigate("/voters-login");
+          navigate("#");
           return;
         }
       }
@@ -201,17 +201,6 @@ const Register = () => {
                     "Register to Vote"
                   )}
                 </Button>
-
-                <div className="text-center text-sm text-muted-foreground">
-                  Already registered?{" "}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={() => navigate("/voters-login")}
-                  >
-                    Login here
-                  </Button>
-                </div>
               </form>
             ) : step === "biometric" ? (
               <BiometricSetup
@@ -239,8 +228,14 @@ const Register = () => {
             <div className="mt-8 p-4 bg-muted/30 rounded-lg">
               <h4 className="font-semibold text-sm mb-2 text-foreground">Security Notice</h4>
               <p className="text-xs text-muted-foreground">
-                Your matric number will be verified against our Student Class List. 
-                Only eligible students can register to vote.
+                <ul>
+                  <li>Your data is securely stored and used only for election purposes.</li>
+                  <li>Your matric number will be verified against the Faculty Student Class List. </li>
+                  <li> Only eligible students that paid Association fees can register to vote.</li> 
+                  <li>Do not share your login or biometric information with anyone.</li>
+                  <li>If you encounter issues, contact the electoral Committee immediately.</li> 
+                </ul>
+                
               </p>
             </div>
           </Card>
