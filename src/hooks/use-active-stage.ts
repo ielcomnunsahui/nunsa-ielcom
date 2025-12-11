@@ -44,7 +44,7 @@ const getStageCtaProps = (stage: Stage): ActiveStageCTA | null => {
             return {
                 text: 'Aspirant Application',
                 icon: Trophy,
-                href: '/aspirant/apply',
+                href: '/aspirant',
             };
         case 'voting period':
             return {
