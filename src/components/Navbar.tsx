@@ -30,7 +30,6 @@ const Navbar = () => {
         const links = [
             { name: 'Home', href: '/', icon: Home },
             { name: 'Candidates', href: '/candidates', icon: Users },
-            { name: 'Register', href: '/register', icon: UserPlus },
             { name: 'Constitution', href: '/rules', icon: Scale },
             { name: 'Get Support', href: '/support', icon: HelpCircle },
         ];
