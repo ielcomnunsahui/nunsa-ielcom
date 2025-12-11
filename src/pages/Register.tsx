@@ -69,14 +69,28 @@ const Register = () => {
       if (voterCheckError) throw voterCheckError;
 
       if (existingVoter) {
-        toast({
-          title: "Already Registered",
-          description: "You are already registered. Please login instead.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        navigate("/voters-login");
-        return;
+        // Check if voter exists but is not verified (partially registered)
+        if (!existingVoter.verified) {
+          toast({
+            title: "Complete Registration",
+            description: "You have started registration but need to complete verification. Please complete your biometric setup or OTP verification.",
+          });
+          setVoterId(existingVoter.id);
+          setEmail(existingVoter.email);
+          setStep("biometric");
+          setIsLoading(false);
+          return;
+        } else {
+          // Fully registered and verified
+          toast({
+            title: "Already Registered",
+            description: "You are already registered and verified. Please login instead.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          navigate("/voters-login");
+          return;
+        }
       }
 
       // Register voter via backend function to bypass RLS and return voterId
@@ -205,7 +219,7 @@ const Register = () => {
                 email={email}
                 onComplete={() => {
                   setStep("verify");
-                  setTimeout(() => navigate("/voters-login"), 2000);
+                  setTimeout(() => navigate("/"), 2000); // Redirect to home instead of voters-login
                 }}
               />
             ) : (
@@ -213,10 +227,10 @@ const Register = () => {
                 <CheckCircle2 className="w-16 h-16 text-success mx-auto" />
                 <div>
                   <h3 className="text-xl font-semibold mb-2 text-foreground">
-                    Verification Complete!
+                    Registration Complete!
                   </h3>
                   <p className="text-muted-foreground">
-                    Redirecting you to login...
+                    Redirecting you to home page...
                   </p>
                 </div>
               </div>

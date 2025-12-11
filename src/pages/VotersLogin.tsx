@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Fingerprint, Loader2, Mail } from "lucide-react";
 import { z } from "zod";
+import { BiometricSetup } from "@/components/BiometricSetup";
 
 const matricSchema = z.object({
   matric: z.string()
@@ -19,7 +20,7 @@ const matricSchema = z.object({
 
 const VotersLogin = () => {
   const [matric, setMatric] = useState("");
-  const [step, setStep] = useState<"matric" | "auth" | "otp">("matric");
+  const [step, setStep] = useState<"matric" | "auth" | "otp" | "complete-setup">("matric");
   const [voterId, setVoterId] = useState("");
   const [email, setEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -52,12 +53,15 @@ const VotersLogin = () => {
         return;
       }
 
+      // Check if voter exists but is not verified (partially registered)
       if (!voterData.verified) {
         toast({
-          title: "Not Verified",
-          description: "Please complete your registration verification first.",
-          variant: "destructive",
+          title: "Complete Registration",
+          description: "Please complete your biometric setup or OTP verification to finish registration.",
         });
+        setVoterId(voterData.id);
+        setEmail(voterData.email);
+        setStep("complete-setup");
         setIsLoading(false);
         return;
       }
@@ -223,6 +227,14 @@ const VotersLogin = () => {
     }
   };
 
+  const handleSetupComplete = () => {
+    toast({
+      title: "Registration Complete!",
+      description: "Your account has been verified. You can now login when voting opens.",
+    });
+    setTimeout(() => navigate("/"), 2000); // Redirect to home after completing setup
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -236,18 +248,25 @@ const VotersLogin = () => {
                   <Fingerprint className="w-8 h-8 text-primary-foreground" />
                 ) : step === "auth" ? (
                   <Fingerprint className="w-8 h-8 text-primary-foreground" />
+                ) : step === "complete-setup" ? (
+                  <Fingerprint className="w-8 h-8 text-primary-foreground" />
                 ) : (
                   <Mail className="w-8 h-8 text-primary-foreground" />
                 )}
               </div>
               <h1 className="text-3xl font-bold mb-2 text-foreground">
-                {step === "matric" ? "Voter Login" : step === "auth" ? "Authenticate" : "Verify OTP"}
+                {step === "matric" ? "Voter Login" : 
+                 step === "auth" ? "Authenticate" : 
+                 step === "complete-setup" ? "Complete Setup" : 
+                 "Verify OTP"}
               </h1>
               <p className="text-muted-foreground">
                 {step === "matric" 
                   ? "Enter your matric number to continue" 
                   : step === "auth"
                   ? "Choose your authentication method"
+                  : step === "complete-setup"
+                  ? "Complete your registration to proceed"
                   : "Enter the code sent to your email"}
               </p>
             </div>
@@ -298,6 +317,27 @@ const VotersLogin = () => {
                   </Button>
                 </div>
               </form>
+            ) : step === "complete-setup" ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg mb-6">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Setup Required:</strong> You need to complete your biometric setup or OTP verification to finish your registration.
+                  </p>
+                </div>
+                <BiometricSetup
+                  voterId={voterId}
+                  email={email}
+                  onComplete={handleSetupComplete}
+                />
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => setStep("matric")}
+                  type="button"
+                >
+                  Back to Matric Entry
+                </Button>
+              </div>
             ) : step === "auth" ? (
               <div className="space-y-4">
                 <Button 
@@ -411,6 +451,8 @@ const VotersLogin = () => {
                   ? "Your matric number is verified against our secure student roster."
                   : step === "auth"
                   ? "Biometric data never leaves your device. OTP is sent securely to your registered email."
+                  : step === "complete-setup"
+                  ? "Complete your verification to secure your voting account."
                   : "OTP codes expire after 10 minutes for your security."}
               </p>
             </div>
