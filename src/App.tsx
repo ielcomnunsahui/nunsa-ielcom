@@ -43,6 +43,8 @@ const App = () => (
           
             <Route path="/register" element={<Register />} />
             
+            <Route path="/voters-login" element={<VotersLogin />} />
+            
             <Route path="/aspirant/apply" element={<AspirantApplication />} />
          
           {/* Protected routes for general authenticated users */}
@@ -50,7 +52,6 @@ const App = () => (
           <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Index />} />
             <Route path="/aspirant" element={<AspirantDashboard />} />
-            <Route path="/voters-login" element={<VotersLogin />} />
             <Route path="/vote" element={<Vote />} />
           </Route>
 
