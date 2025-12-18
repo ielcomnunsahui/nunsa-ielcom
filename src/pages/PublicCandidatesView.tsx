@@ -192,19 +192,6 @@ export function PublicCandidatesView() {
 
         if (candidatesError) throw candidatesError;
 
-        // 3. Map Aspirants to unified DisplayCandidate interface
-        const promotedCandidates: DisplayCandidate[] = (aspirantsData as AspirantRow[])
-          .map(a => ({
-              id: a.id,
-              full_name: a.full_name,
-              positionName: a.aspirant_positions?.name || 'Position N/A',
-              manifesto: a.why_running || 'No manifesto provided by aspirant.',
-              photoUrl: a.photo_url,
-              source: 'aspirant',
-              level: a.level,
-              gender: a.gender,
-              isQualified: a.promoted_to_candidate === true && a.screening_result === 'Qualified',
-          }));
 
         // 4. Map Admin Candidates to unified DisplayCandidate interface
         const adminCandidates: DisplayCandidate[] = (candidatesData as CandidateRow[])
@@ -219,18 +206,7 @@ export function PublicCandidatesView() {
             }));
 
 
-        // 5. Combine and remove potential duplicates (Aspirants table takes precedence)
-        const combinedCandidates = [...promotedCandidates];
-        const aspirantIds = new Set(promotedCandidates.map(c => c.id));
-        
-        // Add admin candidates only if their ID doesn't already exist 
-        adminCandidates.forEach(adminCandidate => {
-            if (!aspirantIds.has(adminCandidate.id.replace('admin-', ''))) {
-                combinedCandidates.push(adminCandidate);
-            }
-        });
-
-        setCandidates(combinedCandidates);
+        setCandidates(adminCandidates);
 
         // 6. Fetch all distinct positions for filtering
         const { data: positionsData, error: positionsError } = await supabase
