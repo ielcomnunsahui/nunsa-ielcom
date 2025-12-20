@@ -8,7 +8,9 @@ import { Upload, Download, Loader2, CheckCircle2, AlertCircle, ChevronDown, Chev
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"; 
-import { Separator } from "@/components/ui/separator"; // Assuming Separator exists
+import { Separator } from "@/components/ui/separator";
+import { VoterAnalyticsCard } from "./VoterAnalyticsCard";
+import { getStudentLevelSync, calculateVoterAnalytics, LEVEL_ORDER, VoterAnalytics } from "@/utils/levelCalculator";
 
 // Define interfaces for type safety
 interface Student {
@@ -21,30 +23,18 @@ interface GroupedRoster {
   [level: string]: Student[];
 }
 
+interface Voter {
+  id: string;
+  matric: string;
+  name: string;
+  email: string;
+  verified: boolean;
+  voted: boolean;
+  created_at: string;
+}
+
 // --- CONFIGURATION ---
 const CURRENT_ACADEMIC_YEAR = 25; // Represents 2025/2026 academic session
-
-// Utility to calculate the student's current level based on entry year (YY)
-const getStudentLevel = (matric: string): string => {
-  const match = matric.match(/^(\d{2})\//);
-  if (!match) return "Unknown";
-
-  const entryYear = parseInt(match[1], 10);
-  
-  if (entryYear > CURRENT_ACADEMIC_YEAR) return "Unknown (Future)";
-
-  const yearDiff = CURRENT_ACADEMIC_YEAR - entryYear;
-
-  switch (yearDiff) {
-    case 0: return "100L";
-    case 1: return "200L";
-    case 2: return "300L";
-    case 3: return "400L";
-    case 4: return "500L";
-    default: return "Final Year/Other";
-  }
-};
-
 
 export function AdminStudentRoster() {
   const { toast } = useToast();
@@ -58,10 +48,12 @@ export function AdminStudentRoster() {
   const [roster, setRoster] = useState<GroupedRoster>({});
   const [isLoadingRoster, setIsLoadingRoster] = useState(true);
   const [openLevels, setOpenLevels] = useState<Set<string>>(new Set()); 
-  const [rosterSearchTerm, setRosterSearchTerm] = useState(""); // NEW: Search state for the roster
+  const [rosterSearchTerm, setRosterSearchTerm] = useState("");
 
-  // Defined order of levels for display
-  const LEVEL_ORDER = useMemo(() => ["100L", "200L", "300L", "400L", "500L", "Final Year/Other", "Unknown", "Unknown (Future)"], []);
+  // Voter Analytics State
+  const [voters, setVoters] = useState<Voter[]>([]);
+  const [isLoadingVoters, setIsLoadingVoters] = useState(true);
+  const [voterAnalytics, setVoterAnalytics] = useState<VoterAnalytics[]>([]);
   
   // --- Data Fetching & Processing ---
 
@@ -75,12 +67,13 @@ export function AdminStudentRoster() {
       if (error) throw error;
 
       const students: Student[] = (data || []) as Student[];
-      setAllStudents(students); // Store flat list for search
+      setAllStudents(students);
       
       const groupedData: GroupedRoster = {};
 
       students.forEach(student => {
-        const studentLevel = student.level || getStudentLevel(student.matric);
+        // Use level from database if available, otherwise calculate from matric
+        const studentLevel = student.level || getStudentLevelSync(student.matric);
         
         if (!groupedData[studentLevel]) {
           groupedData[studentLevel] = [];
@@ -88,6 +81,7 @@ export function AdminStudentRoster() {
         groupedData[studentLevel].push({ ...student, level: studentLevel });
       });
       
+      // Sort students within each level by matric number
       Object.keys(groupedData).forEach(level => {
         groupedData[level].sort((a, b) => a.matric.localeCompare(b.matric));
       });
@@ -106,32 +100,59 @@ export function AdminStudentRoster() {
     }
   }, [toast]);
 
+  const fetchVoters = useCallback(async () => {
+    setIsLoadingVoters(true);
+    try {
+      const { data, error } = await supabase
+        .from("voters")
+        .select("id, matric, name, email, verified, voted, created_at")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setVoters(data || []);
+    } catch (error) {
+      console.error("Error fetching voters:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load voter data for analytics.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingVoters(false);
+    }
+  }, [toast]);
+
+  // Calculate analytics when data changes
+  useEffect(() => {
+    if (allStudents.length > 0 && !isLoadingVoters) {
+      const analytics = calculateVoterAnalytics(allStudents, voters);
+      setVoterAnalytics(analytics);
+    }
+  }, [allStudents, voters, isLoadingVoters]);
+
   useEffect(() => {
     fetchStudentRoster();
-  }, [fetchStudentRoster]);
-
+    fetchVoters();
+  }, [fetchStudentRoster, fetchVoters]);
 
   // --- Filtered Roster (Memoized for performance) ---
 
   const sortedLevels = useMemo(() => {
-    // Filter out levels that are not present and sort the remaining
-    return LEVEL_ORDER.filter(level => roster[level]);
-  }, [roster, LEVEL_ORDER]);
+    return LEVEL_ORDER.filter(level => roster[level] && roster[level].length > 0);
+  }, [roster]);
   
   const totalStudents = allStudents.length;
 
-  // Function to filter students within a specific level group based on search term
   const getFilteredStudentsForLevel = useCallback((level: string): Student[] => {
     const term = rosterSearchTerm.toLowerCase();
     if (!roster[level]) return [];
-    if (!term) return roster[level]; // Return all if no search term
+    if (!term) return roster[level];
 
     return roster[level].filter(student => 
         student.name.toLowerCase().includes(term) ||
         student.matric.toLowerCase().includes(term)
     );
   }, [roster, rosterSearchTerm]);
-
 
   // --- Handlers ---
 
@@ -146,7 +167,6 @@ export function AdminStudentRoster() {
           return newSet;
       });
   }, []);
-
 
   const downloadTemplate = () => {
     const csv = "matric,name,level\n21/08nus001,Awwal Abubakar,500L\n24/08nus002,Abubakri Farouq,200L";
@@ -187,13 +207,12 @@ export function AdminStudentRoster() {
       const dataLines = lines.slice(1);
       
       const students = dataLines.map(line => {
-        // Robust split, handles basic commas but assumes no complex names
         const parts = line.split(",").map(s => s.trim());
         const [matric, name, csvLevel] = parts;
         
         const lowerMatric = matric ? matric.toLowerCase() : "";
         
-        const calculatedLevel = lowerMatric ? getStudentLevel(lowerMatric) : "Unknown";
+        const calculatedLevel = lowerMatric ? getStudentLevelSync(lowerMatric) : "Unknown";
         // Use CSV level if provided and valid, otherwise use calculated level
         const finalLevel = csvLevel && csvLevel.toLowerCase() !== "level" ? csvLevel : calculatedLevel; 
 
@@ -249,11 +268,15 @@ export function AdminStudentRoster() {
       });
     } finally {
       setIsUploading(false);
-      // Clear file input value
       if (e.target instanceof HTMLInputElement) {
         e.target.value = "";
       }
     }
+  };
+
+  const refreshAllData = () => {
+    fetchStudentRoster();
+    fetchVoters();
   };
 
   // --- Helper Component ---
@@ -272,7 +295,6 @@ export function AdminStudentRoster() {
     }
 
     return (
-        // Responsive List: Table for desktop, simplified list for mobile
         <div className="p-4 bg-white max-h-[350px] overflow-y-auto">
             {/* Desktop Table View */}
             <div className="hidden md:block">
@@ -287,7 +309,7 @@ export function AdminStudentRoster() {
                         {students.map((student) => (
                             <TableRow key={student.matric} className="hover:bg-blue-50/50 transition-colors">
                                 <TableCell className="font-medium text-gray-800">{student.name}</TableCell>
-                                <TableCell className="text-right font-mono text-sm text-gray-600">{student.matric}</TableCell>
+                                <TableCell className="text-right font-mono text-sm text-gray-600">{student.matric.toUpperCase()}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -312,20 +334,26 @@ export function AdminStudentRoster() {
   // --- Main Render ---
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-10">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-10">
       
       {/* HEADER */}
       <div className="text-left md:text-left">
         <h1 className="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center md:justify-start">
             <GraduationCap className="w-8 h-8 mr-3 text-blue-600" />
-            Voter Roster Control Panel
+            Voter Roster & Analytics Control Panel
         </h1>
         <p className="text-lg text-gray-600">
-          Securely manage the list of eligible student voters for the election system.
+          Manage eligible student voters and monitor registration & turnout analytics by academic level.
         </p>
       </div>
 
       <Separator className="bg-gray-200" />
+
+      {/* VOTER ANALYTICS SECTION */}
+      <VoterAnalyticsCard 
+        analytics={voterAnalytics} 
+        isLoading={isLoadingRoster || isLoadingVoters} 
+      />
 
       {/* STATISTICS */}
       <Card className="shadow-lg bg-white border-t-4 border-blue-600">
@@ -336,7 +364,7 @@ export function AdminStudentRoster() {
             </CardTitle>
         </CardHeader>
         <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-3 bg-blue-50 rounded-lg text-center">
                     <p className="text-sm font-medium text-blue-800">Total Records</p>
                     <p className="text-2xl font-extrabold text-blue-600 mt-1">{totalStudents}</p>
@@ -352,7 +380,6 @@ export function AdminStudentRoster() {
             </div>
         </CardContent>
       </Card>
-
 
       {/* MAIN CONTENT GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -422,7 +449,7 @@ export function AdminStudentRoster() {
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       <AlertTitle className="font-semibold">Upload Complete! ({uploadResult.success} records)</AlertTitle>
                       <AlertDescription>
-                        Records successfully added or updated. The roster below has been refreshed.
+                        Records successfully added or updated. The roster and analytics have been refreshed.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -450,8 +477,9 @@ export function AdminStudentRoster() {
             <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
               <h4 className="font-semibold text-sm mb-2 text-gray-700">Important Note on Level Calculation:</h4>
               <ul className="text-xs text-gray-500 space-y-1 list-disc list-inside">
-                <li>If the `level` column is empty in your CSV, the system automatically calculates it based on the entry year in the matric number (e.g., `24/....` is 200L in the 2025/2026 session).</li>
-                <li>Providing the `level` in the CSV overrides the automatic calculation.</li>
+                <li>The system first checks the database for existing level information for each student.</li>
+                <li>If no level is found in the database, it automatically calculates based on the entry year in the matric number (e.g., `24/....` is 200L in the 2025/2026 session).</li>
+                <li>Providing the `level` in the CSV overrides both database and automatic calculation.</li>
               </ul>
             </div>
           </CardContent>
@@ -468,7 +496,7 @@ export function AdminStudentRoster() {
           </CardHeader>
           <CardContent>
             
-            {/* Roster Search Bar (NEW INTERACTIVITY) */}
+            {/* Roster Search Bar */}
             <div className="relative mb-4">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -498,8 +526,8 @@ export function AdminStudentRoster() {
                   const filteredCount = filteredStudents.length;
                   const isOpen = openLevels.has(level);
 
-                  // Skip rendering level sections with zero students, unless a search is active and it has filtered results
-                  if (studentsCount === 0 && !rosterSearchTerm) return null;
+                  // Show level even if no students match search, but hide if no students at all
+                  if (studentsCount === 0) return null;
 
                   return (
                     <div key={level} className="border rounded-lg shadow-md transition-shadow duration-300 hover:shadow-lg">
@@ -520,7 +548,6 @@ export function AdminStudentRoster() {
                                 {isOpen ? <ChevronUp className="w-5 h-5 text-blue-600" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
                             </div>
                         </button>
-                        {/* Custom Collapsible Content */}
                         <div 
                            className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[500px] border-t' : 'max-h-0'}`}
                            style={{ maxHeight: isOpen ? '500px' : '0' }}
@@ -534,9 +561,9 @@ export function AdminStudentRoster() {
             )}
             </CardContent>
             <CardFooter className="pt-4 border-t bg-gray-50 rounded-b-lg">
-              <Button onClick={fetchStudentRoster} variant="outline" disabled={isLoadingRoster} className="w-full sm:w-auto border-blue-300 hover:bg-blue-50">
-                  <RefreshCw className={`w-4 h-4 mr-2 ${isLoadingRoster ? 'animate-spin' : ''}`} />
-                  {isLoadingRoster ? 'Refreshing...' : 'Force Refresh Roster'}
+              <Button onClick={refreshAllData} variant="outline" disabled={isLoadingRoster || isLoadingVoters} className="w-full sm:w-auto border-blue-300 hover:bg-blue-50">
+                  <RefreshCw className={`w-4 h-4 mr-2 ${(isLoadingRoster || isLoadingVoters) ? 'animate-spin' : ''}`} />
+                  {(isLoadingRoster || isLoadingVoters) ? 'Refreshing...' : 'Refresh Data & Analytics'}
               </Button>
             </CardFooter>
         </Card>
