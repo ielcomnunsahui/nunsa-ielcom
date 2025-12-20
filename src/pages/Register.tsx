@@ -69,14 +69,28 @@ const Register = () => {
       if (voterCheckError) throw voterCheckError;
 
       if (existingVoter) {
-        toast({
-          title: "Already Registered",
-          description: "You are already registered. Please login instead.",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        navigate("/voters-login");
-        return;
+        // Check if voter exists but is not verified (partially registered)
+        if (!existingVoter.verified) {
+          toast({
+            title: "Complete Registration",
+            description: "You have started registration but need to complete verification. Please complete your biometric setup or OTP verification.",
+          });
+          setVoterId(existingVoter.id);
+          setEmail(existingVoter.email);
+          setStep("biometric");
+          setIsLoading(false);
+          return;
+        } else {
+          // Fully registered and verified
+          toast({
+            title: "Already Registered",
+            description: "You are already registered and verified. Please wait for the elections or contact support if you believe this is an error.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          navigate("#");
+          return;
+        }
       }
 
       // Register voter via backend function to bypass RLS and return voterId
@@ -187,17 +201,6 @@ const Register = () => {
                     "Register to Vote"
                   )}
                 </Button>
-
-                <div className="text-center text-sm text-muted-foreground">
-                  Already registered?{" "}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={() => navigate("/voters-login")}
-                  >
-                    Login here
-                  </Button>
-                </div>
               </form>
             ) : step === "biometric" ? (
               <BiometricSetup
@@ -205,7 +208,7 @@ const Register = () => {
                 email={email}
                 onComplete={() => {
                   setStep("verify");
-                  setTimeout(() => navigate("/voters-login"), 2000);
+                  setTimeout(() => navigate("/"), 2000); // Redirect to home instead of voters-login
                 }}
               />
             ) : (
@@ -213,10 +216,10 @@ const Register = () => {
                 <CheckCircle2 className="w-16 h-16 text-success mx-auto" />
                 <div>
                   <h3 className="text-xl font-semibold mb-2 text-foreground">
-                    Verification Complete!
+                    Registration Complete!
                   </h3>
                   <p className="text-muted-foreground">
-                    Redirecting you to login...
+                    Redirecting you to home page...
                   </p>
                 </div>
               </div>
@@ -225,8 +228,14 @@ const Register = () => {
             <div className="mt-8 p-4 bg-muted/30 rounded-lg">
               <h4 className="font-semibold text-sm mb-2 text-foreground">Security Notice</h4>
               <p className="text-xs text-muted-foreground">
-                Your matric number will be verified against our Student Class List. 
-                Only eligible students can register to vote.
+                <ul>
+                  <li>Your data is securely stored and used only for election purposes.</li>
+                  <li>Your matric number will be verified against the Faculty Student Class List. </li>
+                  <li> Only eligible students that paid Association fees can register to vote.</li> 
+                  <li>Do not share your login or biometric information with anyone.</li>
+                  <li>If you encounter issues, contact the electoral Committee immediately.</li> 
+                </ul>
+                
               </p>
             </div>
           </Card>

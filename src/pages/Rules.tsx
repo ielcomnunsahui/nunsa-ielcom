@@ -163,9 +163,9 @@ function RulesPage() {
         <ul className="list-disc list-inside space-y-2 pl-4">
           <li>Must be a bonafide student of Al-Hikmah University, Ilorin.</li>
           <li>Must be a registered student in the faculty of Nursing Sciences Students List.</li>
-          <li>Must have paid current session fees.</li>
+          <li>Must have paid current session Association fees.</li>
           <li>Must complete voter registration with a valid matric number.</li>
-          <li>Must verify identity via biometric authentication.</li>
+          <li>Must verify identity via biometric authentication or Email OTP.</li>
           <li>Each voter can vote only once.</li>
           <li>One vote per position per student.</li>
         </ul>
@@ -213,25 +213,6 @@ function RulesPage() {
           <li>Impersonation of another voter is grounds for immediate disqualification.</li>
           <li>Disruption of the electoral process in any manner.</li>
           <li>Violations may result in Disciplinary actions, sanctions, or Disqualification.</li>
-        </ul>
-      ),
-    },
-    {
-      id: "Timeline-Deadlines",
-      title: "TIMELINE & DEADLINES",
-      icon: Clock,
-      content: (
-        <ul className="list-disc list-inside space-y-2 pl-4">
-          <li>Sales of Form period: 15th to 30th November, 2025.</li>
-          <li>Handing-Over to Care-Taker Committee/Pre-Induction: 26th November, 2025.</li>
-          <li>Screening: 8th of November, 2025 (Please note potential conflict with form sales deadline).</li>
-          <li>Campaign period: Starts after Purchase of form by Aspirants.</li>
-          <li>Campaign period Ends: 24 hours before voting.</li>
-          <li>Manifesto Day: 14th of December, 2025.</li>
-          <li>Election Day: 21st of December, 2025.</li>
-          <li>Voting period: 8-12 hours (specific time to be announced).</li>
-          <li>Results publication: Within 24 hours of vote closure.</li>
-          <li>Appeal period: 24 hours after results publication.</li>
         </ul>
       ),
     },

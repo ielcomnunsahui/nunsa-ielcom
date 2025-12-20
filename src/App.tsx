@@ -31,7 +31,7 @@ const App = () => (
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
           {/* Public routes - no authentication required */}
-          <Route path="/" element={<Index />} />
+          
           <Route path="/results" element={<Results />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin-login" element={<AdminLogin />} />
@@ -40,14 +40,18 @@ const App = () => (
           <Route path="/support" element={<SupportPage />} />
           <Route path="/candidates" element={<PublicCandidatesView />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
+          
+            <Route path="/register" element={<Register />} />
+            
+            <Route path="/voters-login" element={<VotersLogin />} />
+            
+            <Route path="/aspirant/apply" element={<AspirantApplication />} />
          
           {/* Protected routes for general authenticated users */}
           <Route element={<ProtectedRoute allowedRoles={['general', 'admin']} />}>
+          <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Index />} />
-            <Route path="/register" element={<Register />} />
             <Route path="/aspirant" element={<AspirantDashboard />} />
-            <Route path="/aspirant/apply" element={<AspirantApplication />} />
-            <Route path="/voters-login" element={<VotersLogin />} />
             <Route path="/vote" element={<Vote />} />
           </Route>
 
