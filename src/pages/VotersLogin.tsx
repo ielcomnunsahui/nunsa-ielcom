@@ -304,18 +304,6 @@ const VotersLogin = () => {
                     "Continue"
                   )}
                 </Button>
-
-                <div className="text-center text-sm text-muted-foreground">
-                  Not registered yet?{" "}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-primary"
-                    onClick={() => navigate("/register")}
-                    type="button"
-                  >
-                    Register here
-                  </Button>
-                </div>
               </form>
             ) : step === "complete-setup" ? (
               <div className="space-y-4">
