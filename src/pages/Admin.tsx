@@ -16,13 +16,14 @@ import { AdminAuditLog } from "@/components/admin/AdminAuditLog";
 import { AdminPositions } from "@/components/admin/AdminPositions";
 import { AdminStudentRoster } from "@/components/admin/AdminStudentRoster";
 import { AdminAspirants } from "@/components/admin/AdminAspirants";
+import { AdminLiveResults } from "@/components/admin/AdminLiveResults";
 
 // Placeholder for the external logo asset
 import NUNSALogo from "@/assets/Ielcom-logo.png"; 
 
 // --- Configuration for Tabs (Modular) ---
 const TABS_CONFIG = [
-  { value: "overview", label: "Overview", icon: Calendar, component: null },
+  { value: "Live Results", label: "Live Results", icon: Calendar, component: AdminLiveResults },
   { value: "positions", label: "Positions", icon: Award, component: AdminPositions },
   { value: "aspirants", label: "Aspirants", icon: Trophy, component: AdminAspirants },
   { value: "candidates", label: "Candidates", icon: Users, component: AdminCandidates },
@@ -202,12 +203,12 @@ const Admin = () => {
               </div>
             </div>
             <Button 
-                onClick={() => navigate("/results")} 
+                onClick={() => navigate("/public-results")} 
                 variant="default" 
                 size="sm" 
                 className="bg-blue-600 hover:bg-blue-700 text-white shadow-md px-4 py-2 w-full sm:w-auto"
             >
-              Live Results
+              Public Results
             </Button>
           </div>
 
@@ -278,26 +279,11 @@ const Admin = () => {
               {/* Tabs Content */}
               {TABS_CONFIG.map((tab) => (
                 <TabsContent key={tab.value} value={tab.value} className="space-y-4 pt-4 sm:pt-6">
-                    {tab.value === 'overview' ? (
-                        // Overview Content (Modified for Mobile)
-                        <div className="text-center py-8 sm:py-12 bg-white rounded-lg border border-dashed border-gray-300 p-4">
-                            <Calendar className="w-10 h-10 sm:w-16 sm:h-16 text-blue-600 mx-auto mb-3" />
-                            <h3 className="text-lg sm:text-2xl font-bold mb-2 text-gray-900">
-                            Election Management System
-                            </h3>
-                            <p className="text-sm text-gray-600 max-w-2xl mx-auto">
-                            Use the tabs to manage student roster, aspirants, positions, voters, timeline, and audit logs.
-                            </p>
-                            <div className="mt-6 flex flex-col gap-3 justify-center max-w-xs mx-auto">
-                            <Button 
-                                onClick={() => navigate("/")} 
-                                variant="outline" 
-                                className="w-full"
-                            >
-                                View Public Site
-                            </Button>
-                            </div>
-                        </div>
+                    {tab.value === "Live Results" ? (
+                        // Special Layout for Live Results (Full-width)
+                        <Card className="p-2 sm:p-4 md:p-6 shadow-inner bg-white border-none">
+                            {tab.component && <tab.component />}
+                        </Card>
                     ) : (
                         // Dynamic Component Loading (Full-width card)
                         <Card className="p-2 sm:p-4 md:p-6 shadow-inner bg-white border-none">

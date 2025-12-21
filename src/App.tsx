@@ -20,6 +20,7 @@ import Rules from "./pages/Rules";
 import AspirantDashboard from "./pages/AspirantDashboard";
 import AspirantApplication from "./pages/AspirantApplication";
 import PublicCandidatesView from "./pages/PublicCandidatesView";
+import PublicResults from "./pages/PublicResults";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="/support" element={<SupportPage />} />
           <Route path="/candidates" element={<PublicCandidatesView />} />
           <Route path="/setup-admin" element={<SetupAdmin />} />
+          <Route path="/public-results" element={<PublicResults />} />
           
             <Route path="/register" element={<Register />} />
             
